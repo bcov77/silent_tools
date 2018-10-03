@@ -11,9 +11,8 @@
 #import silent_tools
 
 
-# If dont_overwrite_duplicates true, then duplicate entries are simply listed one
-# after another in tags
-def silent_slurp(fname, clear_scores=False, dont_overwite_duplicates=False):
+#Duplicates get @number appended to their name
+def silent_slurp(fname, clear_scores=False):
     f = open(fname)
     lines = f.readlines()
     f.close()
@@ -30,6 +29,8 @@ def silent_slurp(fname, clear_scores=False, dont_overwite_duplicates=False):
     silent_tags = []
 
     current_tag = ""
+    match_tag = ""
+
     skip_next = False
     for line in lines:
         line = line.strip()
@@ -44,24 +45,47 @@ def silent_slurp(fname, clear_scores=False, dont_overwite_duplicates=False):
             skip_next = True
             continue
 
-        sp = line.split()
         if (line.startswith("SCORE")):
+            sp = line.split()
             current_tag = sp[-1]
+            match_tag = current_tag
 
+            number = 0
+            while ( current_tag in silent_dict ):
+                number += 1
+                current_tag = match_tag + "@%i"%number
+
+            silent_dict[current_tag] = []
             silent_tags.append(current_tag)
 
-            if ( not dont_overwite_duplicates or current_tag not in silent_dict ):
-                silent_dict[current_tag] = []
-
             if ( clear_scores ):
-                sp = ["SCORE:", "0", current_tag]
+                line = "SCORE: 0 %s"%match_tag
 
-        if ( current_tag == ""):
+        if ( match_tag == ""):
             continue
 
-        if (sp[-1] == current_tag or line.startswith("NONCANONICAL")):
+        if (line.endswith(match_tag) or line.startswith("NONCANONICAL")):
             silent_dict[current_tag].append(line)
             continue
 
 
     return silent_dict, silent_tags, scoreline
+
+
+
+def silent_header(scoreline):
+    return "SEQUENCE: A\n%s\n"%scoreline.strip()
+
+
+def silent_body(silent_dict, tags=None):
+    if ( tags is None ):
+        tags = list(silent_dict.keys())
+
+
+
+
+
+
+
+
+
