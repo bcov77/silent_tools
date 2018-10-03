@@ -11,65 +11,66 @@
 #import silent_tools
 
 
-#Duplicates get @number appended to their name
-def silent_slurp(fname, clear_scores=False):
-    f = open(fname)
-    lines = f.readlines()
-    f.close()
+#Quickly parse a silent file without pulling it into memory
+def silent_parse(file, clear_scores=False):
 
-    assert( len(lines) >= 2 )
-    assert( lines[0].startswith("SEQUENCE:" ) )
-    assert( lines[1].startswith("SCORE:" ) )
 
-    scoreline = lines[1].strip()
+    line1 = next(file)
+    line2 = next(file)
+
+    assert( line1.startswith("SEQUENCE:" ) )
+    assert( line2.startswith("SCORE:" ) )
+
+    scoreline = line2.strip()
     if ( clear_scores ):
         scoreline = "SCORE: score description"
 
-    silent_dict = {}
+
+
+
+    silent_offsets = {}
     silent_tags = []
 
     current_tag = ""
     match_tag = ""
 
-    skip_next = False
-    for line in lines:
-        line = line.strip()
-        if (len(line) == 0):
-            continue
+    pos = len(line1) + len(line2)
+    while (True):
+        try:
+            line = next(file)
+        except:
+            break
 
-        if (skip_next):
-            skip_next = False
-            continue
+        line_len = len(line)
 
-        if (line.startswith("SEQUENCE")):
-            skip_next = True
-            continue
+        last_pos = pos
+        pos += line_len
 
-        if (line.startswith("SCORE")):
+        if ( line_len == 0 ):
+            continue
+        if ( line[0] != "S" ):
+            continue
+        if ( line.startswith("SEQUENCE") ):
+            try:
+                next(file)
+            except:
+                pass
+            continue
+        if ( line.startswith("SCORE") ):
             sp = line.split()
-            current_tag = sp[-1]
-            match_tag = current_tag
+
+            tag = sp[-1]
 
             number = 0
-            while ( current_tag in silent_dict ):
+            while ( tag in silent_offsets ):
                 number += 1
                 current_tag = match_tag + "@%i"%number
 
-            silent_dict[current_tag] = []
-            silent_tags.append(current_tag)
-
-            if ( clear_scores ):
-                line = "SCORE: 0 %s"%match_tag
-
-        if ( match_tag == ""):
-            continue
-
-        if (line.endswith(match_tag) or line.startswith("NONCANONICAL")):
-            silent_dict[current_tag].append(line)
-            continue
+            silent_offsets[tag] = last_pos
+            silent_tags.append(tag)
 
 
-    return silent_dict, silent_tags, scoreline
+    return silent_offsets, silent_tags, scoreline
 
 
 
