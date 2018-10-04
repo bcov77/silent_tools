@@ -86,7 +86,7 @@ def get_silent_structure_file_open( f, silent_index, tag ):
 
 
 def write_silent_file( file, silent_index, structures ):
-    with open(file) as f:
+    with open(file, "w") as f:
         f.write(silent_header(silent_index))
 
         for structure in structures:
