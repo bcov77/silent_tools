@@ -27,6 +27,10 @@ def get_silent_index(file):
     if ( not os.path.exists( index_name ) ):
         return build_silent_index(file)
 
+    if ( os.path.getmtime(file) > os.path.getmtime(index_name) ):
+        eprint("Warning!! Silent file newer than index. Rebuilding index!")
+        return build_silent_index(file)
+
     with open(index_name) as f:
         silent_index = json.loads(f.read())
 
@@ -35,6 +39,59 @@ def get_silent_index(file):
 
     eprint("Warning!! Silent file changed size. Rebuilding index!")
     return build_silent_index(file)
+
+
+def get_silent_structures(file, silent_index, tags):
+    with open(file) as f:
+        return get_silent_structures_file_open(f, silent_index, tags)
+
+def get_silent_structure(file, silent_index, tag):
+    with open(file) as f:
+        return get_silent_structure_file_open(f, silent_index, tag)
+
+def get_silent_structures_file_open( f, silent_index, tags ):
+    structures = []
+    for tag in tags:
+        structures.append(get_silent_structure_file_open(f, silent_index, tag))
+
+    return structures
+
+
+def get_silent_structure_file_open( f, silent_index, tag ):
+    assert( tag in silent_index['index'] )
+    entry = silent_index['index'][tag]
+
+    f.seek( entry['seek'] )
+
+    first_line = next(f)
+    assert(first_line.startswith("SCORE"))
+
+    structure = [first_line]
+
+    while (True):
+        try:
+            line = next(f)
+        except:
+            break
+
+        if ( len(line) == 0 ):
+            continue
+        if ( line[0] == "S" ):  # score or sequence, either way we're done
+            break
+
+        structure.append(line)
+
+    return structure
+
+
+
+def write_silent_file( file, silent_index, structures ):
+    with open(file) as f:
+        f.write(silent_header(silent_index))
+
+        for structure in structures:
+            f.write("".join(structure))
+
 
 
 def cmd(command, wait=True):
@@ -64,7 +121,7 @@ def build_silent_index(file):
         assert( line1.startswith("SEQUENCE:" ) )
         assert( line2.startswith("SCORE:" ) )
 
-        scoreline = line2.strip()
+        scoreline = line2
 
     # I'm sorry. If you put description in the name of your pose, well..
     lines = cmd("command grep --byte-offset SCORE: %s | grep -v description | awk '{print $1,$NF}'"%file).strip().split("\n")
@@ -75,8 +132,17 @@ def build_silent_index(file):
     for line in lines:
         # print(line)
         sp = line.strip().split()
-        index[sp[1]]["seek"] = int(sp[0][:-7])
-        order.append(sp[1])
+        name = sp[1]
+        if ( name in index ):
+            number = 0
+            while (name + "_%i"%number in index):
+                number += 1
+            new_name = name + "_%i"%number
+            index[new_name]["orig"] = name
+            name = new_name
+
+        index[name]["seek"] = int(sp[0][:-7])
+        order.append(name)
 
     size = file_size(file)
 
@@ -98,12 +164,9 @@ def validate_silent_index(file, silent_index):
 def file_size(file):
     return int(cmd("du -b %s | awk '{print $1}'"%file).strip())
 
-def silent_header(scoreline):
-    return "SEQUENCE: A\n%s\n"%scoreline.strip()
+def silent_header(silent_index):
+    return "SEQUENCE: A\n%s\n"%silent_index['scoreline'].strip()
 
-def silent_body(silent_dict, tags=None):
-    if ( tags is None ):
-        tags = list(silent_dict.keys())
 
 
 
