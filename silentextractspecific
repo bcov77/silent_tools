@@ -1,0 +1,56 @@
+#!/bin/bash
+
+tags=""
+
+#https://stackoverflow.com/questions/369758/how-to-trim-whitespace-from-a-bash-variable
+trim() {
+    local var="$*"
+    # remove leading whitespace characters
+    var="${var#"${var%%[![:space:]]*}"}"
+    # remove trailing whitespace characters
+    var="${var%"${var##*[![:space:]]}"}"   
+    echo -n "$var"
+}
+
+
+#https://stackoverflow.com/questions/19408649/pipe-input-into-a-script
+if [ -p /dev/stdin ]; then
+    while IFS= read tag; do
+        tags="$tags $(trim $tag)"
+    done
+
+fi
+
+
+
+if [ $# -eq 0 ]; then
+    echo ""
+    echo "silentextractspecific by bcov - a tool to easily extract specific tags from silent files"
+    echo "Usage:"
+    echo "        cat list_of_tags.list | silentextractspecific myfile.silent"
+    echo "                             or"
+    echo "        silentextractspecific myfile.silent tag1 tag2 tag3"
+    exit 1
+fi
+
+
+
+silent=$1
+shift
+for tag in "$@"; do
+    tags="$tags $(trim $tag)"
+done
+
+
+#https://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script/677212#677212
+command -v extract_pdbs >/dev/null 2>&1 || { 
+    echo >&2 "You must have extract_pdbs on your path!"; 
+    echo >&2 "Try doing cd silent_tools; ln -s /software/rosetta/latest/bin/extract_pdbs ."
+    exit 1; 
+}
+
+if [ -z $tags ]; then
+    exit 0;
+fi
+
+extract_pdbs -in:file:silent $silent -in:file:silent_struct_type binary -in:file:tags $tags
