@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+
+import distutils.spawn
+import os
+import sys
+sys.path.append(os.path.dirname(distutils.spawn.find_executable("silent_tools.py")))
+import silent_tools
+from silent_tools import eprint
+
+# Don't throw an error when someone uses head
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL) 
+
+if (len(sys.argv) == 1):
+    eprint("")
+    eprint('silentrename by bcov - a tool to rename the tags of a silent file')
+    eprint("Usage:")
+    eprint("        cat list_of_tags.list | silentslice myfile.silent > new.silent")
+    eprint("                             or")
+    eprint("        silentslice myfile.silent tag1 tag2 tag3 > new.silent")
+    eprint("")
+    eprint("Important! You must pass the same number of tags that there are in the")
+    eprint("    silent file. A typical example would look like this:")
+    eprint("")
+    eprint("silentls my.silent | tr 'a' 'e' | silentrename my.silent > new.silent")
+    eprint("                             or")
+    eprint("silentls my.silent | sed 's/_0001$//g' | silentrename my.silent > new.silent")
+    sys.exit(1)
+
+silent_file = sys.argv[1]
+
+tags = []
+for line in sys.stdin.readlines() + sys.argv[2:]:
+    line = line.strip()
+    if (len(line) == 0):
+        continue
+    tags.append(line)
+
+
+silent_index = silent_tools.get_silent_index( silent_file )
+
+if (len(silent_index['tags']) != len(tags)):
+    eprint("Error! Number of input tags (%i) is not equal to number of tags in silent file (%i)!"%
+        (len(tags), len(silent_index['tags'] )))
+    sys.exit(1)
+
+structures = silent_tools.get_silent_structures( silent_file, silent_index, silent_index['tags'] )
+
+to_print = silent_tools.silent_header( silent_index )
+
+for istructure in range(len(structures)):
+    structure = structures[istructure]
+    to_print += "".join(structure).replace(silent_index['tags'][istructure], tags[istructure])
+
+print(to_print)
+
+

@@ -24,12 +24,12 @@ fi
 
 
 if [ $# -eq 0 ]; then
-    echo ""
-    echo "silentextractspecific by bcov - a tool to easily extract specific tags from silent files"
-    echo "Usage:"
-    echo "        cat list_of_tags.list | silentextractspecific myfile.silent"
-    echo "                             or"
-    echo "        silentextractspecific myfile.silent tag1 tag2 tag3"
+    echo >&2 ""
+    echo >&2 "silentextractspecific by bcov - a tool to easily extract specific tags from silent files"
+    echo >&2 "Usage:"
+    echo >&2 "        cat list_of_tags.list | silentextractspecific myfile.silent"
+    echo >&2 "                             or"
+    echo >&2 "        silentextractspecific myfile.silent tag1 tag2 tag3"
     exit 1
 fi
 

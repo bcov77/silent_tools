@@ -123,7 +123,7 @@ def build_silent_index(file):
 
         scoreline = line2
 
-    # I'm sorry. If you put description in the name of your pose, well..
+    # I'm sorry. If you put description in the name of your pose, it will disappear
     lines = cmd("command grep --byte-offset SCORE: %s | grep -v description | awk '{print $1,$NF}'"%file).strip().split("\n")
 
     index = defaultdict(lambda : {}, {})
@@ -134,7 +134,7 @@ def build_silent_index(file):
         sp = line.strip().split()
         name = sp[1]
         if ( name in index ):
-            number = 0
+            number = 1
             while (name + "_%i"%number in index):
                 number += 1
             new_name = name + "_%i"%number
@@ -149,7 +149,7 @@ def build_silent_index(file):
     silent_index = {"index":index, "tags":order, "scoreline":scoreline, "size":size}
 
     try:
-        f = open(file + ".idx", "w")
+        f = open(get_index_name(file), "w")
         f.write(json.dumps(silent_index))
         f.close()
     except:

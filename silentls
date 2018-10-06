@@ -5,16 +5,17 @@ import os
 import sys
 sys.path.append(os.path.dirname(distutils.spawn.find_executable("silent_tools.py")))
 import silent_tools
+from silent_tools import eprint
 
 # Don't throw an error when someone uses head
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE, SIG_DFL) 
 
 if (len(sys.argv) == 1):
-    print("")
-    print('silentls by bcov - a tool to allow you to "ls" a silent file')
-    print("Usage:")
-    print("        silentls myfile.silent")
+    eprint("")
+    eprint('silentls by bcov - a tool to allow you to "ls" a silent file')
+    eprint("Usage:")
+    eprint("        silentls myfile.silent")
     sys.exit(1)
 
 

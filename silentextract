@@ -2,10 +2,10 @@
 
 
 if [ $# -eq 0 ]; then
-    echo ""
-    echo "silentextract by bcov - a tool to easily extract all tags from silent files"
-    echo "Usage:"
-    echo "        silentextractspecific myfile.silent"
+    echo >&2 ""
+    echo >&2 "silentextract by bcov - a tool to easily extract all tags from silent files"
+    echo >&2 "Usage:"
+    echo >&2 "        silentextractspecific myfile.silent"
 
     exit 1
 fi
