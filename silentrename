@@ -15,15 +15,19 @@ if (len(sys.argv) == 1):
     eprint("")
     eprint('silentrename by bcov - a tool to rename the tags of a silent file')
     eprint("Usage:")
-    eprint("        cat list_of_tags.list | silentslice myfile.silent > new.silent")
+    eprint("        cat list_of_tags.list | silentrename myfile.silent > new.silent")
     eprint("                             or")
-    eprint("        silentslice myfile.silent tag1 tag2 tag3 > new.silent")
+    eprint("        silentrename myfile.silent tag1 tag2 tag3 > new.silent")
     eprint("")
     eprint("Important! You must pass the same number of tags that there are in the")
-    eprint("    silent file. A typical example would look like this:")
+    eprint("    silent file.")
     eprint("")
-    eprint("silentls my.silent | tr 'a' 'e' | silentrename my.silent > new.silent")
-    eprint("                             or")
+    eprint("Example usage:")
+    eprint("")
+    eprint("silentls my.silent > tags.list")
+    eprint("vi tags.list")
+    eprint("cat tags.list | silentrename my.silent > new.silent")
+    eprint("")
     eprint("silentls my.silent | sed 's/_0001$//g' | silentrename my.silent > new.silent")
     sys.exit(1)
 
@@ -44,14 +48,18 @@ if (len(silent_index['tags']) != len(tags)):
         (len(tags), len(silent_index['tags'] )))
     sys.exit(1)
 
-structures = silent_tools.get_silent_structures( silent_file, silent_index, silent_index['tags'] )
 
-to_print = silent_tools.silent_header( silent_index )
+sys.stdout.write( silent_tools.silent_header( silent_index ) )
+sys.stdout.flush()
 
-for istructure in range(len(structures)):
-    structure = structures[istructure]
-    to_print += "".join(structure).replace(silent_index['tags'][istructure], tags[istructure])
+with open(silent_file) as sf:
+    for itag in range(len(tags)):
 
-print(to_print)
+        original_tag = silent_index['tags'][itag]
+        structure = silent_tools.get_silent_structure_file_open( sf, silent_index, original_tag )
+
+        sys.stdout.write("".join(structure).replace(original_tag, tags[itag]))
+        sys.stdout.flush()
+
 
 
