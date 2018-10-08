@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 tags=""
 
 #https://stackoverflow.com/questions/369758/how-to-trim-whitespace-from-a-bash-variable
@@ -21,39 +22,32 @@ if [ -p /dev/stdin ]; then
 
 fi
 
-
-
-if [ $# -eq 0 ]; then
-    echo >&2 ""
-    echo >&2 "silentextractspecific by bcov - a tool to easily extract specific tags from silent files"
-    echo >&2 "Usage:"
-    echo >&2 "        cat list_of_tags.list | silentextractspecific myfile.silent"
-    echo >&2 "                             or"
-    echo >&2 "        silentextractspecific myfile.silent tag1 tag2 tag3"
-    exit 1
-fi
-
-
-
-silent=$1
-shift
 for tag in "$@"; do
     tags="$tags $(trim $tag)"
 done
 
 
 if [ -z "$tags" ]; then
-    exit 0;
+    echo >&2 ""
+    echo >&2 "silentfrompdbs by bcov - a tool to make a silent file from pdbs"
+    echo >&2 "Usage:"
+    echo >&2 "        cat list_of_tags.list | silentfrompdbs > silent.silent"
+    echo >&2 "                             or"
+    echo >&2 "        silentfrompdbs tag1 tag2 tag3 > silent.silent"
+    exit 1
 fi
+
 
 
 tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_file="tmp_${tmp_file}.silent"
 
-echo "$tags" | silentslice $silent > $tmp_file
+score_jd2 -s $tags -out:file:silent $tmp_file -out:file:silent_struct_type binary 1>&2
 
-silentextract $tmp_file
+silentls $tmp_file | sed 's/_0001$//g' | silentrename $tmp_file
 
 rm $tmp_file
+rm $tmp_file.idx
+
 
 

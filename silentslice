@@ -27,16 +27,26 @@ for line in sys.stdin.readlines() + sys.argv[2:]:
     line = line.strip()
     if (len(line) == 0):
         continue
-    tags.append(line)
+    sp = line.split(" ")
+    for tag in sp:
+        tags.append(tag)
 
 
 silent_index = silent_tools.get_silent_index( silent_file )
 
-structures = silent_tools.get_silent_structures( silent_file, silent_index, tags )
 
-to_print = silent_tools.silent_header( silent_index )
+sys.stdout.write( silent_tools.silent_header( silent_index ) )
+sys.stdout.flush()
 
-for structure in structures:
-    to_print += "".join(structure)
+with open(silent_file) as sf:
+    for tag in tags:
 
-print(to_print)
+        if ( tag not in silent_index['index'] ):
+            eprint("silentslice: Unable to find tag: %s"%tag)
+            continue
+        structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
+
+        sys.stdout.write("".join(structure))
+        sys.stdout.flush()
+
+
