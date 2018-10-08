@@ -1,30 +1,26 @@
 #!/bin/bash
 
-
 tags=""
 
 tmp_list=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_list="tmp_${tmp_list}.list"
 rm $tmp_list > /dev/null 2>&1
 
-#https://stackoverflow.com/questions/19408649/pipe-input-into-a-script
 if [ -p /dev/stdin ]; then
     while read tag; do
         echo $tag
-        # tags+="$tag\n"
-        # tags+="$tag\n"
     done > $tmp_list
 
 fi
 
 for tag in "$@"; do
-    tags+="$tag\n"
+    echo $tag
 done >> $tmp_list
 
 
 if [ ! -f $tmp_list ]; then
     echo >&2 ""
-    echo >&2 "silentfrompdbs by bcov - a tool to make a silent file from pdbs"
+    echo >&2 "silentfrompdbsparallel by bcov - a tool to make a silent file from pdbs in parallel"
     echo >&2 "Usage:"
     echo >&2 "        cat list_of_tags.list | silentfrompdbs > silent.silent"
     echo >&2 "                             or"
@@ -32,19 +28,18 @@ if [ ! -f $tmp_list ]; then
     exit 1
 fi
 
+tmp_fol=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
+tmp_fol="tmp_${tmp_fol}"
 
+cpus=$(parallel --number-of-cores)
 
+splitno=$((( $(wc -l $tmp_list | awk '{print $1}') / $cpus + 1)))
 
-tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
-tmp_file="tmp_${tmp_file}.silent"
+mkdir $tmp_fol
 
-score_jd2 -l $tmp_list -out:file:silent $tmp_file -out:file:silent_struct_type binary 1>&2
+split -l $splitno $tmp_list $tmp_fol/x
 
-silentls $tmp_file | sed 's/_0001$//g' | silentrename $tmp_file
+ls $tmp_fol/x* | parallel 'cat {} | silentfrompdbs'
 
 rm $tmp_list
-rm $tmp_file
-rm $tmp_file.idx
-
-
-
+rm -r $tmp_fol
