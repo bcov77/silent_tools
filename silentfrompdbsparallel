@@ -39,7 +39,7 @@ mkdir $tmp_fol
 
 split -l $splitno $tmp_list $tmp_fol/x
 
-ls $tmp_fol/x* | parallel 'cat {} | silentfrompdbs'
+ls $tmp_fol/x* | parallel -j14 'cat {} | silentfrompdbs'
 
 rm $tmp_list
 rm -r $tmp_fol
