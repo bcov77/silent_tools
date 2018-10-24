@@ -6,6 +6,7 @@ import sys
 sys.path.append(os.path.dirname(distutils.spawn.find_executable("silent_tools.py")))
 import silent_tools
 from silent_tools import eprint
+import re
 
 # Don't throw an error when someone uses head
 from signal import signal, SIGPIPE, SIG_DFL
@@ -56,9 +57,10 @@ with open(silent_file) as sf:
     for itag in range(len(tags)):
 
         original_tag = silent_index['tags'][itag]
+        re_tag = re.compile(original_tag + r"\w*")
         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, original_tag )
 
-        sys.stdout.write("".join(structure).replace(original_tag, tags[itag]))
+        sys.stdout.write(re_tag.sub(tags[itag], "".join(structure)))#.replace(original_tag, tags[itag]))
         sys.stdout.flush()
 
 
