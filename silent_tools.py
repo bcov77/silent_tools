@@ -17,6 +17,7 @@ import subprocess
 import json
 from collections import defaultdict
 
+SILENT_INDEX_VERSION = "2"
 
 # Returns the silent index which allows rapid
 #  parsing of the silent file
@@ -128,11 +129,13 @@ def build_silent_index(file):
 
     index = defaultdict(lambda : {}, {})
     order = []
+    orig_order = []
 
     for line in lines:
         # print(line)
         sp = line.strip().split()
         name = sp[1]
+        orig_order.append(name)
         if ( name in index ):
             number = 1
             while (name + "_%i"%number in index):
@@ -146,7 +149,7 @@ def build_silent_index(file):
 
     size = file_size(file)
 
-    silent_index = {"index":index, "tags":order, "scoreline":scoreline, "size":size}
+    silent_index = {"index":index, "tags":order, "orig_tags":orig_order, "scoreline":scoreline, "size":size, "version":SILENT_INDEX_VERSION}
 
     try:
         f = open(get_index_name(file), "w")
@@ -158,6 +161,11 @@ def build_silent_index(file):
     return silent_index
 
 def validate_silent_index(file, silent_index):
+    if ( "version" not in silent_index ):
+        return False
+    if ( silent_index['version'] != SILENT_INDEX_VERSION ):
+        print("Silentindex from older version of silent_tools")
+        return False
     size = file_size(file)
     return size == silent_index["size"]
 

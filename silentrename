@@ -56,11 +56,11 @@ sys.stdout.flush()
 with open(silent_file) as sf:
     for itag in range(len(tags)):
 
-        original_tag = silent_index['tags'][itag]
-        re_tag = re.compile(original_tag + r"\w*")
-        structure = silent_tools.get_silent_structure_file_open( sf, silent_index, original_tag )
+        index_tag = silent_index['tags'][itag]
+        structure = silent_tools.get_silent_structure_file_open( sf, silent_index, index_tag )
 
-        sys.stdout.write(re_tag.sub(tags[itag], "".join(structure)))#.replace(original_tag, tags[itag]))
+        original_tag = silent_index['orig_tags'][itag]
+        sys.stdout.write("".join(structure).replace(original_tag, tags[itag]))
         sys.stdout.flush()
 
 
