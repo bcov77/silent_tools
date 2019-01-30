@@ -48,8 +48,9 @@ with open(silent_file) as sf:
             eprint("silentsequence: no ANNOTATED_SEQUENCE for tag %s"%tag)
             bad = True
         if ( chain_endings is None ):
-            eprint("silentsequence: no CHAIN_ENDINGS for tag %s"%tag)
-            bad = True
+            #eprint("silentsequence: no CHAIN_ENDINGS for tag %s"%tag)
+            #bad = True
+            chain_endings=[]
 
         if (bad):
             continue
