@@ -31,7 +31,7 @@ fi
 tmp_fol=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_fol="tmp_${tmp_fol}"
 
-cpus=$(parallel --number-of-cores)
+cpus=18 #$(parallel --number-of-cores)
 
 splitno=$((( $(wc -l $tmp_list | awk '{print $1}') / $cpus + 1)))
 
