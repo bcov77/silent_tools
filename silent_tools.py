@@ -17,7 +17,7 @@ import subprocess
 import json
 from collections import defaultdict
 
-SILENT_INDEX_VERSION = "2"
+SILENT_INDEX_VERSION = "3"
 
 # Returns the silent index which allows rapid
 #  parsing of the silent file
@@ -29,7 +29,7 @@ def get_silent_index(file):
         return build_silent_index(file)
 
     if ( os.path.getmtime(file) > os.path.getmtime(index_name) ):
-        eprint("Warning!! Silent file newer than index. Rebuilding index!")
+        eprint("Silent file newer than index. Rebuilding index!")
         return build_silent_index(file)
 
     with open(index_name) as f:
@@ -38,7 +38,7 @@ def get_silent_index(file):
     if ( validate_silent_index(file, silent_index) ):
         return silent_index
 
-    eprint("Warning!! Silent file changed size. Rebuilding index!")
+    eprint("Silent file changed size. Rebuilding index!")
     return build_silent_index(file)
 
 
@@ -104,6 +104,16 @@ def cmd(command, wait=True):
     the_stuff = the_command.communicate()
     return str(the_stuff[0]) + str(the_stuff[1])
 
+    
+def cmd2(command, wait=True):
+    # print ""
+    # print command
+    the_command = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if (not wait):
+        return
+    the_stuff = the_command.communicate()
+    return str(the_stuff[0]),  str(the_stuff[1]), the_command.returncode
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
@@ -117,12 +127,12 @@ def build_silent_index(file):
 
     with open(file) as f:
         line1 = next(f)
-        line2 = next(f)
+        if ( line1.startswith("SEQUENCE:" ) ):
+            line1 = next(f)
 
-        assert( line1.startswith("SEQUENCE:" ) )
-        assert( line2.startswith("SCORE:" ) )
+        assert( line1.startswith("SCORE:" ) )
 
-        scoreline = line2
+        scoreline = line1
 
     # I'm sorry. If you put description in the name of your pose, it will disappear
     lines = cmd("command grep --byte-offset SCORE: %s | grep -v description | awk '{print $1,$NF}'"%file).strip().split("\n")
@@ -130,6 +140,7 @@ def build_silent_index(file):
     index = defaultdict(lambda : {}, {})
     order = []
     orig_order = []
+    unique_tags = True
 
     for line in lines:
         # print(line)
@@ -143,13 +154,15 @@ def build_silent_index(file):
             new_name = name + "_%i"%number
             index[new_name]["orig"] = name
             name = new_name
+            unique_tags = False
 
         index[name]["seek"] = int(sp[0][:-7])
         order.append(name)
 
     size = file_size(file)
 
-    silent_index = {"index":index, "tags":order, "orig_tags":orig_order, "scoreline":scoreline, "size":size, "version":SILENT_INDEX_VERSION}
+    silent_index = {"index":index, "tags":order, "orig_tags":orig_order, "scoreline":scoreline, "size":size, 
+                    "unique_tags":unique_tags, "version":SILENT_INDEX_VERSION}
 
     try:
         f = open(get_index_name(file), "w")
@@ -164,7 +177,7 @@ def validate_silent_index(file, silent_index):
     if ( "version" not in silent_index ):
         return False
     if ( silent_index['version'] != SILENT_INDEX_VERSION ):
-        print("Silentindex from older version of silent_tools")
+        eprint("Silentindex from older version of silent_tools")
         return False
     size = file_size(file)
     return size == silent_index["size"]
