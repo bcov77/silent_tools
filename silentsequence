@@ -28,38 +28,10 @@ with open(silent_file) as sf:
 
         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
 
-        full_sequence = None
-        chain_endings = None
+        sequence_chunks = silent_tools.get_sequence_chunks( structure )
 
-        for line in structure:
-            if ( line.startswith("ANNOTATED_SEQUENCE") ):
-                tmp = line
-                tmp = tmp.strip()
-                tmp = tmp.split()[1]
-                full_sequence = re.sub(r"\[[^]]*\]", "", tmp)
-            if ( line.startswith("CHAIN_ENDINGS") ):
-                tmp = line
-                tmp = tmp.strip()
-                tmp = tmp.split()
-                chain_endings = [int(x) for x in tmp[1:len(tmp)-1] ]
-
-        bad = False
-        if ( full_sequence is None ):
-            eprint("silentsequence: no ANNOTATED_SEQUENCE for tag %s"%tag)
-            bad = True
-        if ( chain_endings is None ):
-            #eprint("silentsequence: no CHAIN_ENDINGS for tag %s"%tag)
-            #bad = True
-            chain_endings=[]
-
-        if (bad):
+        if (sequence_chunks is None):
             continue
-
-        sequence_chunks = []
-        last_end = 0
-        for end in chain_endings + [len(full_sequence)]:
-            sequence_chunks.append( full_sequence[last_end:end] )
-            last_end = end
 
         sys.stdout.write(" ".join(sequence_chunks) + " " + tag + "\n")
         sys.stdout.flush()

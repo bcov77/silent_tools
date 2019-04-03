@@ -13,39 +13,37 @@ signal(SIGPIPE, SIG_DFL)
 
 if (len(sys.argv) == 1):
     eprint("")
-    eprint('silentslice by bcov - a tool to allow you extract a smaller silent file from a larger one')
+    eprint('silentsketchextractca by bcov - a tool to allow you extract the CA atoms from a pose')
     eprint("Usage:")
     eprint("        cat list_of_tags.list | silentslice myfile.silent > new.silent")
     eprint("                             or")
     eprint("        silentslice myfile.silent tag1 tag2 tag3 > new.silent")
     sys.exit(1)
 
+
+
 silent_file = sys.argv[1]
-
-tags = []
-for line in sys.stdin.readlines() + sys.argv[2:]:
-    line = line.strip()
-    if (len(line) == 0):
-        continue
-    sp = line.split(" ")
-    for tag in sp:
-        tags.append(tag)
-
 
 silent_index = silent_tools.get_silent_index( silent_file )
 
-sys.stdout.write( silent_tools.silent_header( silent_index ) )
-sys.stdout.flush()
-
 with open(silent_file) as sf:
-    for tag in tags:
+    for tag in silent_index['tags']:
 
         if ( tag not in silent_index['index'] ):
             eprint("silentslice: Unable to find tag: %s"%tag)
             continue
         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
 
-        sys.stdout.write("".join(structure))
-        sys.stdout.flush()
+        sequence = "".join(silent_tools.get_sequence_chunks(structure))
+        cas = silent_tools.sketch_get_atoms(structure, [1])
+
+        lines = silent_tools.write_pdb_atoms( cas, sequence, ["CA"] )
+
+        with open(tag + ".pdb", "w") as f:
+            f.write("".join(lines))
+
+
+        print(tag)
+
 
 

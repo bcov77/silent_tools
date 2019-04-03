@@ -31,15 +31,15 @@ fi
 tmp_fol=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_fol="tmp_${tmp_fol}"
 
-cpus=18 #$(parallel --number-of-cores)
+cpus=16 #$(parallel --number-of-cores)
 
-splitno=$((( $(wc -l $tmp_list | awk '{print $1}') / $cpus + 1)))
+splitno=$((( $(wc -l $tmp_list | awk '{print $1}') / ($cpus * 8) + 1)))
 
 mkdir $tmp_fol
 
 split -l $splitno $tmp_list $tmp_fol/x
 
-ls $tmp_fol/x* | parallel -j14 'cat {} | silentfrompdbs'
+ls $tmp_fol/x* | parallel -j16 'cat {} | silentfrompdbs'
 
 rm $tmp_list
 rm -r $tmp_fol
