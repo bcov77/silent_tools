@@ -23,12 +23,12 @@ scorename=${silentname}.sc
 # tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 # tmp_file="tmp_${tmp_file}.tmp"
 
-types=$(grep description $1 | tr -d "[:blank:]" | sort | uniq)
+types=$(grep -a description $1 | tr -d "[:blank:]" | sort | uniq)
 num_types=$(echo "$types" | wc -l)
 
 if [[ $num_types -eq 1 ]]; then
-    head -n 2 $1 | grep description > $scorename    # just in case there's no sequence line
-    grep '^SCORE:' $1 | grep -v description >> $scorename
+    head -n 2 $1 | grep -a description > $scorename    # just in case there's no sequence line
+    grep -a '^SCORE:' $1 | grep -a -v description >> $scorename
     exit 0
 fi
 
@@ -46,10 +46,10 @@ done
 
 current_file=-1
 IFS=$'\n' 
-for line in $(grep '^SCORE:' $1); do
-    if $(echo "$line" | grep -q description); then
+for line in $(grep -a '^SCORE:' $1); do
+    if $(echo "$line" | grep -a -q description); then
         # echo >&2 "$line"
-        current_file=$(echo "$types" | grep --line-number $(echo $line | tr -d "[:blank:]" ) | cut -d ':' -f1)
+        current_file=$(echo "$types" | grep -a --line-number $(echo $line | tr -d "[:blank:]" ) | cut -d ':' -f1)
         if [[ -z $current_file ]]; then
             echo >&2 "Uh oh"
             exit 1
