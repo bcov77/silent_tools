@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ $# -ne 2 ]; then
+    echo >&2 "silentsplit by bcov - a tool to split a silentfile into equal size parts"
+    echo >&2 "Usage:"
+    echo >&2 "        silentsplit myfile.silent TAGS_PER_SILENT_FILE"
+    exit 1
+fi
+
+if [[ ! -f $1 ]]; then
+    echo >&2 "silentsplit: File not found: $1"
+    exit 1
+fi
+
+if ! [[ $2 -ge 1 ]]; then
+    echo >&2 "silentsplit: Second argument must be a number greater than 0"
+    exit 1
+fi
+
+
+tmp_fol=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
+tmp_fol="tmp_${tmp_fol}/"
+rm -r $tmp_fol > /dev/null 2>&1
+mkdir $tmp_fol
+
+silent=$(realpath $1)
+cd $tmp_fol
+split -l $2 <(silentls $silent)
+
+for xfile in x*; do
+    cat $xfile | silentslice $silent > ../${xfile}.silent
+done
+
+cd ..
+
+rm -r $tmp_fol
