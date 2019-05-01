@@ -32,7 +32,7 @@ def get_silent_index(file):
     if ( not os.path.exists( index_name ) ):
         return build_silent_index(file)
 
-    if ( os.path.getmtime(file) > os.path.getmtime(index_name) ):
+    if ( os.path.getmtime(get_real_file(file)) > os.path.getmtime(index_name) ):
         eprint("Silent file newer than index. Rebuilding index!")
         return build_silent_index(file)
 
@@ -88,6 +88,13 @@ def get_silent_structure_file_open( f, silent_index, tag ):
 
     return structure
 
+
+def get_real_file(file):
+    real_file = cmd("realpath %s"%file).strip()
+    if ( not os.path.exists(file) or not os.path.exists(real_file) ):
+        eprint("silent_tools: Error file doesn't exist: file")
+        assert(False)
+    return real_file
 
 
 def write_silent_file( file, silent_index, structures ):
@@ -210,6 +217,7 @@ def validate_silent_index(file, silent_index):
     return size == silent_index["size"]
 
 def file_size(file):
+    file = get_real_file(file)
     return int(cmd("du -b %s | awk '{print $1}'"%file).strip())
 
 def silent_header(silent_index):
