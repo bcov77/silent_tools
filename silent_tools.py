@@ -16,6 +16,7 @@ import sys
 import subprocess
 import json
 from collections import defaultdict
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 import numpy as np
 import re
 import struct
