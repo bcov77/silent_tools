@@ -91,7 +91,9 @@ def get_silent_structure_file_open( f, silent_index, tag ):
 
 
 def get_real_file(file):
-    real_file = cmd("realpath %s"%file).strip()
+    real_file, error, code = cmd("realpath %s"%file).strip()
+    if ( code != 0 ):
+        real_file = cmd("readlink -f %s"%file).strip()
     if ( not os.path.exists(file) or not os.path.exists(real_file) ):
         eprint("silent_tools: Error file doesn't exist: file")
         assert(False)
