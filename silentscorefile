@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $# -ne 0 ]; then
+if [ $# -ne 1 ]; then
     echo >&2 "silentscorefile by bcov - a tool to extract a scorefile from a silentfile"
     echo >&2 "Usage:"
     echo >&2 "        silentscorefile myfile.silent"
