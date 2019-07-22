@@ -38,7 +38,7 @@ fi
 tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_file="tmp_${tmp_file}.silent"
 
-score_jd2 -l $tmp_list -out:file:silent $tmp_file -out:file:silent_struct_type binary -extra_res_fa ~/from/jason/H3i.am1bcc.fa.mm.params 1>&2
+score_jd2 -l $tmp_list -out:file:silent $tmp_file -out:file:silent_struct_type binary -extra_res_fa /home/bcov/from/jason/H3i.am1bcc.fa.mm.params 1>&2
 
 silentls $tmp_file | sed 's/_0001$//g' | silentrename $tmp_file
 
