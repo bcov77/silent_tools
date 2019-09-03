@@ -229,7 +229,7 @@ def silent_header(silent_index):
 
 
 
-def get_sequence_chunks(structure):
+def get_sequence_chunks(structure, tag="FIXME"):
 
     full_sequence = None
     chain_endings = None

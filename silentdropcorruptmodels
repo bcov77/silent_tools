@@ -31,7 +31,9 @@ with open(silent_file) as sf:
 
         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
 
-        sequence_chunks = silent_tools.get_sequence_chunks( structure )
+        sequence_chunks = silent_tools.get_sequence_chunks( structure, tag )
+        if ( sequence_chunks is None ):
+            continue
         sequence = "".join(sequence_chunks)
         seqlen = len(sequence)
 
