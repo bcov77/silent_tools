@@ -82,7 +82,7 @@ def get_silent_structure_file_open( f, silent_index, tag ):
 
         if ( len(line) == 0 ):
             continue
-        if ( line[0] == "S" ):  # score or sequence, either way we're done
+        if ( line[0] == "S" && (line.startswith("SCORE") || line.startswith("SEQUENCE"))):  # score or sequence, either way we're done
             break
 
         structure.append(line)
