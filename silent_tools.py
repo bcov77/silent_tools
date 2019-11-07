@@ -89,6 +89,45 @@ def get_silent_structure_file_open( f, silent_index, tag ):
 
     return structure
 
+def get_silent_structures_true_slice( f, silent_index, idx_start, idx_stop_py, oneline=False ):
+    assert( idx_start >= 0 and idx_stop_py <= len(silent_index['index']) )
+
+    start_seek = silent_index['index'][silent_index['tags'][idx_start]]['seek']
+
+    if ( idx_stop_py == len(silent_index['tags']) ):
+        stop_seek = None
+    else:
+        stop_seek = silent_index['index'][silent_index['tags'][idx_stop_py]]['seek']
+
+    f.seek( start_seek )
+
+    if ( stop_seek is None ):
+        data = f.read()
+    else:
+        data = f.read(stop_seek - start_seek)
+
+    structures = []
+    for idx in range(idx_start, idx_stop_py):
+        start = silent_index['index'][silent_index['tags'][idx]]['seek']
+
+        if ( idx + 1 == idx_stop_py ):
+            stop = None
+        else:
+            stop = silent_index['index'][silent_index['tags'][idx+1]]['seek']
+            assert( stop - start_seek <= len(data) + 1 )
+
+        if ( stop is None ):
+            structure_dat = data[start-start_seek:]
+        else:
+            structure_dat = data[start-start_seek:stop-start_seek]
+
+        if ( not oneline ):
+            structure_dat = [ x + "\n" for x in structure_dat.split("\n") if len(x) > 0 ]
+
+        structures.append(structure_dat)
+
+    return structures
+
 
 def get_real_file(file):
     real_file, error, code = cmd2("realpath %s"%file)
@@ -107,7 +146,6 @@ def write_silent_file( file, silent_index, structures ):
 
         for structure in structures:
             f.write("".join(structure))
-
 
 
 def cmd(command, wait=True):
