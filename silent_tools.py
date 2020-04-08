@@ -175,17 +175,46 @@ def get_index_name(file):
     return file + ".idx"
 
 
-def build_silent_index(file):
-    assert(os.path.exists(file))
+def assert_is_silent_and_get_scoreline(file):
+    if ( not os.path.exists(file) ):
+        sys.exit("silent_tools: Error! Silent file doesn't exist: " + file)
 
-    with open(file) as f:
+    try:
+        f = open(file)
+    except:
+        sys.exit("silent_tools: Error! Can't open silent file: " + file)
+
+    try:
         line1 = next(f)
-        if ( line1.startswith("SEQUENCE:" ) ):
+    except:
+        sys.exit("silent_tools: Error! Silent file is empty: " + file)
+
+    if ( line1.startswith("SEQUENCE:" ) ):
+        try:
             line1 = next(f)
+        except:
+            sys.exit("silent_tools: Error! Truncated silent file: " + file)
+    else:
+        eprint("silent_tools: Warning! Silent file doesn't have SEQUENCE line")
 
-        assert( line1.startswith("SCORE:" ) )
+    if ( not line1.startswith("SCORE:" ) ):
+        sys.exit("silent_tools: Error! Silent file doesn't have SCORE: header")
 
-        scoreline = line1
+    scoreline = line1
+
+    sp = scoreline.split()
+    if ( sp[1] != "score" and sp[1] != "total_score" ):
+        eprint("silent_tools: Warning! First score is not \"score\"! Rosetta won't like this!")
+
+    f.close()
+
+    return scoreline
+
+
+def build_silent_index(file):
+
+    scoreline = assert_is_silent_and_get_scoreline(file)
+
 
     # I'm sorry. If you put description in the name of your pose, it will disappear
     lines = cmd("command grep -a --byte-offset '^SCORE:' %s | grep -v description | awk '{print $1,$NF}'"%file).strip().split("\n")
@@ -442,10 +471,91 @@ def decode6bit( jar ):
     return ba
 
 
+import importlib.util
+package_name = 'numba'
+spec = importlib.util.find_spec(package_name)
+if not spec is None:
+    
+    from numba import njit
+
+
+    @njit(fastmath=True)
+    def code_from_6bit(_8bit):
+
+        if ( ( _8bit >= 65) and (_8bit <= 90) ): return _8bit - 65
+        if ( ( _8bit >= 97) and (_8bit <= 122) ): return _8bit - 97 + 26
+        if ( ( _8bit >= 48) and (_8bit <= 57) ): return _8bit - 48 + 52
+        if (   _8bit == 43  ): return 62
+        return 63
+
+
+    @njit(fastmath=True)
+    def decode_32_to_24( i0, i1, i2, i3 ):
+        i0 = code_from_6bit( i0 )
+        i1 = code_from_6bit( i1 )
+        i2 = code_from_6bit( i2 )
+        i3 = code_from_6bit( i3 )
+
+        o0 = 0xFF & (i0 | (i1 << 6))
+        o1 = 0xFF & ((i1 >> 2) | (i2 << 4))
+        o2 = 0xFF & ((i3 << 2) | (i2 >> 4))
+
+        return o0, o1, o2
+
+    scr = np.zeros(1000, np.byte)
+    def decode6bit( jar ):
+        return numba_decode6bit( jar.encode(), scr )
+
+    @njit(fastmath=True)
+    def numba_decode6bit( jar, ba ):
+        ba_len = 0
+
+        this_str = np.zeros(4, np.byte)
+
+        valid_bits = 0
+        i = 0
+        while ( i < len(jar) ):
+
+            this_str[0] = 0
+            this_str[1] = 0
+            this_str[2] = 0
+            this_str[3] = 0
+
+            j = 0
+            while ( i < len(jar) and j < 4 ):
+                this_str[j] = jar[i]
+                i += 1
+                j += 1
+                valid_bits += 6
+
+            # print(this_str)
+            o0, o1, o2 = decode_32_to_24(this_str[0], this_str[1], this_str[2], this_str[3])
+            # print(bytess)
+
+            ba[ba_len] = o0
+            ba[ba_len+1] = o1
+            ba[ba_len+2] = o2
+            ba_len += 3
+        valid_bytes = int( valid_bits / 8 )
+        ba = ba[:valid_bytes]
+        assert(len(ba) % 4 == 0)
+        return ba
+
+
+
+
+_float_packer_by_len = None
 def silent_line_to_atoms(line):
+    global _float_packer_by_len
+    if ( _float_packer_by_len is None ):
+        _float_packer_by_len = []
+        for i in range(1000):
+            _float_packer_by_len.append(struct.Struct("f"*(i)))
+
+
     ba = decode6bit( line )
 
-    float_packer = struct.Struct("f"*(len(ba)//4))
+    float_packer = _float_packer_by_len[len(ba)//4] #struct.Struct("f"*(len(ba)//4))
 
     floats = float_packer.unpack(ba)
 
@@ -454,39 +564,59 @@ def silent_line_to_atoms(line):
     return np.array(floats).reshape(-1, 3)
 
 
-def sketch_get_atoms_by_residue(structure):
+def get_chains_mask(chunks, chains):
+    sequence = "".join(chunks)
+    if ( chains is None ):
+        mask = np.ones(len(sequence))
+    else:
+        mask = np.zeros(len(sequence))
+        for chain in chains:
+            lb = np.sum([len(chunk) for chunk in chunks[:chain]]).astype(int)
+            ub = np.sum([len(chunk) for chunk in chunks[:chain+1]]).astype(int)
+            mask[lb:ub] = True
+    return mask
 
-    sequence = "".join(get_sequence_chunks(structure))
+
+def sketch_get_atoms_by_residue(structure, chains=None):
+
+    chunks = get_sequence_chunks(structure)
+    sequence = "".join(chunks)
     if ( sequence is None ):
         return None
 
+    mask = get_chains_mask(chunks, chains)
+
     residues = []
 
+    ires = -1
     for line in structure:
+
+        if ( len(line) == 0 ):
+            continue
+
+        if ( line[0] not in "EHL" ):
+            continue
 
         # Ok, so we're going to use some really crappy detection here
         sp = line.split()
         if ( len(sp) != 2 ):
             continue
 
-        binary = sp[0]
-        # Ensure there are lowercase letters
-        if ( binary.upper() == binary ):
+        ires += 1
+        if ( not mask[ires] ):
             continue
 
-        if ( not binary.startswith("L") ):
-            continue
-        binary = binary[1:]
+        binary = sp[0][1:]
 
         residues.append( silent_line_to_atoms( binary ) )
 
-    print(len(sequence), len(residues))
-    assert(len(sequence) == len(residues))
+    # print(np.sum(mask), len(residues))
+    assert(np.sum(mask) == len(residues))
     return residues
 
-def sketch_get_atoms(structure, atom_nums):
+def sketch_get_atoms(structure, atom_nums, chains=None):
 
-    atoms_by_res = sketch_get_atoms_by_residue(structure)
+    atoms_by_res = sketch_get_atoms_by_residue(structure, chains)
 
     final = []
     for residue in atoms_by_res:
