@@ -53,15 +53,41 @@ if (len(silent_index['tags']) != len(tags)):
 sys.stdout.write( silent_tools.silent_header( silent_index ) )
 sys.stdout.flush()
 
+# old slow
+# with open(silent_file) as sf:
+#     for itag in range(len(tags)):
+
+#         index_tag = silent_index['tags'][itag]
+#         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, index_tag )
+
+#         original_tag = silent_index['orig_tags'][itag]
+#         sys.stdout.write("".join(structure).replace(original_tag, tags[itag]))
+#         sys.stdout.flush()
+
+
+total_structures = len(silent_index['tags'])
+seek_size = 1000
+cur_struct = 0
+cur_write = 0
+
 with open(silent_file) as sf:
-    for itag in range(len(tags)):
+    while cur_struct < total_structures:
 
-        index_tag = silent_index['tags'][itag]
-        structure = silent_tools.get_silent_structure_file_open( sf, silent_index, index_tag )
+        if ( cur_struct + seek_size > total_structures ):
+            seek_size = total_structures - cur_struct
 
-        original_tag = silent_index['orig_tags'][itag]
-        sys.stdout.write("".join(structure).replace(original_tag, tags[itag]))
-        sys.stdout.flush()
+        structures = silent_tools.get_silent_structures_true_slice( sf, 
+                            silent_index, cur_struct, cur_struct+seek_size, True )
+
+        for structure in structures:
+            original_tag = silent_index['orig_tags'][cur_write]
+            sys.stdout.write(structure.replace(original_tag, tags[cur_write]))
+            sys.stdout.flush()
+            cur_write += 1
+
+        cur_struct += seek_size
+
+        assert(cur_write == cur_struct)
 
 
 
