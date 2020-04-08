@@ -34,7 +34,7 @@ fi
 
 # Don't change this wording unless you change silentinjectscores
 echo >&2 "Warning!! Multiple scorefiles produced!!"
-
+for tp in $(echo $types); do echo >&2 $tp; done
 
 scorefiles=()
 has_header=()
