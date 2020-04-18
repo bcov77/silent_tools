@@ -33,7 +33,7 @@ silent_index['scoreline'] = "SCORE: score description"
 sys.stdout.write( silent_tools.silent_header( silent_index ) )
 sys.stdout.flush()
 
-with open(silent_file) as sf:
+with open(silent_file, errors='ignore' ) as sf:
     for itag, tag in enumerate(silent_index['tags']):
 
         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )

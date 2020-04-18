@@ -81,7 +81,7 @@ if ( bad != "" ):
 sys.stdout.write( silent_tools.silent_header( score_index ) )
 sys.stdout.flush()
 
-with open(silent_file) as sf:
+with open(silent_file, errors='ignore') as sf:
     with open(tmpfile + ".sc") as scoref:
         for tag in silent_index['tags']:
 

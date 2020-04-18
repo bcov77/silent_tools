@@ -37,7 +37,7 @@ silent_index = silent_tools.get_silent_index( silent_file )
 sys.stdout.write( silent_tools.silent_header( silent_index ) )
 sys.stdout.flush()
 
-with open(silent_file) as sf:
+with open(silent_file, errors='ignore') as sf:
     for tag in tags:
 
         if ( tag not in silent_index['index'] ):

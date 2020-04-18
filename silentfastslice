@@ -48,7 +48,7 @@ for tag in tags:
 
 tags = sorted(existing_tags, key=lambda x: silent_index['index'][x]['seek'])
 
-with open(silent_file) as sf:
+with open(silent_file, errors='ignore') as sf:
     for tag in tags:
 
         assert( tag in silent_index['index'] )

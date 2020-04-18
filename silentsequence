@@ -23,7 +23,7 @@ silent_file = sys.argv[1]
 
 silent_index = silent_tools.get_silent_index( silent_file )
 
-with open(silent_file) as sf:
+with open(silent_file, errors='ignore') as sf:
     for tag in silent_index['tags']:
 
         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )

@@ -70,7 +70,7 @@ seek_size = 1000
 cur_struct = 0
 cur_write = 0
 
-with open(silent_file) as sf:
+with open(silent_file, errors='ignore') as sf:
     while cur_struct < total_structures:
 
         if ( cur_struct + seek_size > total_structures ):

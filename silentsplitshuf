@@ -58,7 +58,7 @@ def split_name_gen(number):
 
 silent_index = silent_tools.get_silent_index( silent_file )
 
-open_silent_file = open( silent_file )
+open_silent_file = open( silent_file, errors='ignore' )
 
 
 total_structures = len(silent_index['tags'])
