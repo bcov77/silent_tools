@@ -20,6 +20,7 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 import numpy as np
 import re
 import struct
+import bz2
 
 
 SILENT_INDEX_VERSION = "4"
@@ -48,11 +49,11 @@ def get_silent_index(file):
 
 
 def get_silent_structures(file, silent_index, tags):
-    with open(file) as f:
+    with open(file, errors='ignore') as f:
         return get_silent_structures_file_open(f, silent_index, tags)
 
 def get_silent_structure(file, silent_index, tag):
-    with open(file) as f:
+    with open(file, errors='ignore') as f:
         return get_silent_structure_file_open(f, silent_index, tag)
 
 def get_silent_structures_file_open( f, silent_index, tags ):
@@ -70,14 +71,20 @@ def get_silent_structure_file_open( f, silent_index, tag ):
     f.seek( entry['seek'] )
 
     first_line = next(f)
+    return rip_structure_by_lines(f, first_line)[0]
+
+
+def rip_structure_by_lines(f, first_line, save_structure=True):
+
     assert(first_line.startswith("SCORE"))
 
-    structure = [first_line]
+    structure = [first_line] if save_structure else None
 
     while (True):
         try:
             line = next(f)
         except:
+            line = None
             break
 
         if ( len(line) == 0 ):
@@ -85,9 +92,12 @@ def get_silent_structure_file_open( f, silent_index, tag ):
         if ( line[0] == "S" and (line.startswith("SCORE") or line.startswith("SEQUENCE"))):  # score or sequence, either way we're done
             break
 
-        structure.append(line)
+        if ( save_structure ):
+            structure.append(line)
 
-    return structure
+    first_non_structure_line = line
+    return structure, first_non_structure_line
+
 
 def get_silent_structures_true_slice( f, silent_index, idx_start, idx_stop_py, oneline=False ):
     assert( idx_start >= 0 and idx_stop_py <= len(silent_index['index']) )
@@ -175,12 +185,15 @@ def get_index_name(file):
     return file + ".idx"
 
 
-def assert_is_silent_and_get_scoreline(file):
+def assert_is_silent_and_get_scoreline(file, return_f=False):
     if ( not os.path.exists(file) ):
         sys.exit("silent_tools: Error! Silent file doesn't exist: " + file)
 
     try:
-        f = open(file)
+        if ( file.endswith(".bz2") ):
+            f = bz2.open(file, "rt")
+        else:
+            f = open(file, errors='ignore')
     except:
         sys.exit("silent_tools: Error! Can't open silent file: " + file)
 
@@ -206,6 +219,9 @@ def assert_is_silent_and_get_scoreline(file):
     if ( sp[1] != "score" and sp[1] != "total_score" ):
         eprint("silent_tools: Warning! First score is not \"score\"! Rosetta won't like this!")
 
+    if ( return_f ):
+        return scoreline, f
+
     f.close()
 
     return scoreline
@@ -217,7 +233,12 @@ def build_silent_index(file):
 
 
     # I'm sorry. If you put description in the name of your pose, it will disappear
-    lines = cmd("command grep -a --byte-offset '^SCORE:' %s | grep -v description | awk '{print $1,$NF}'"%file).strip().split("\n")
+    lines = cmd2("command grep -a --byte-offset '^SCORE:' %s | grep -v description | tr -d '\r' | awk '{print $1,$NF}'"%file)[0].strip().split("\n")
+
+    # with open("tmp", "w") as f:
+    #     f.write("\n".join(lines))
+    # with open("tmp") as f:
+    #     lines = f.read().split("\n")
 
     index = defaultdict(lambda : {}, {})
     order = []
@@ -227,31 +248,35 @@ def build_silent_index(file):
     dup_index = {}
 
     for line in lines:
+        try:
         # print(line)
-        sp = line.strip().split()
-        name = sp[1]
-        orig_order.append(name)
-        if ( name in index ):
-            # speedup
-            if ( name in dup_index ):
-                number = dup_index[name]
-            else:
-                number = 1
-            # /speedup
+            sp = line.strip().split()
+            name = sp[1]
+            orig_order.append(name)
+            if ( name in index ):
+                # speedup
+                if ( name in dup_index ):
+                    number = dup_index[name]
+                else:
+                    number = 1
+                # /speedup
 
-            while (name + "_%i"%number in index):
-                number += 1
+                while (name + "_%i"%number in index):
+                    number += 1
 
-            # speedup
-            dup_index[name] = number
-            # /speedup
-            new_name = name + "_%i"%number
-            index[new_name]["orig"] = name
-            name = new_name
-            unique_tags = False
+                # speedup
+                dup_index[name] = number
+                # /speedup
+                new_name = name + "_%i"%number
+                index[new_name]["orig"] = name
+                name = new_name
+                unique_tags = False
 
-        index[name]["seek"] = int(sp[0][:-7])
-        order.append(name)
+            index[name]["seek"] = int(sp[0][:-7])
+            order.append(name)
+        except:
+            offset = 0 if len(order) == 0 else index[order[-1]]['seek']
+            eprint("silent_tools: corruption: file_offset: %i -- %s"%(offset, line))
 
     size = file_size(file)
 
@@ -292,7 +317,10 @@ def file_size(file):
     return int(cmd("du -b %s | awk '{print $1}'"%file).strip())
 
 def silent_header(silent_index):
-    return "SEQUENCE: %s\n%s\n"%(silent_index['sequence'], silent_index['scoreline'].strip())
+    return silent_header_slim(silent_index['sequence'], silent_index['scoreline'])
+
+def silent_header_slim(sequence, scoreline):
+    return "SEQUENCE: %s\n%s\n"%(sequence, scoreline.strip())
 
 
 
