@@ -216,7 +216,7 @@ def assert_is_silent_and_get_scoreline(file, return_f=False):
     scoreline = line1
 
     sp = scoreline.split()
-    if ( sp[1] != "score" and sp[1] != "total_score" ):
+    if ( len(sp) < 2 or sp[1] != "score" and sp[1] != "total_score" ):
         eprint("silent_tools: Warning! First score is not \"score\"! Rosetta won't like this!")
 
     if ( return_f ):
