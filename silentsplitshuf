@@ -61,42 +61,63 @@ silent_index = silent_tools.get_silent_index( silent_file )
 open_silent_file = open( silent_file, errors='ignore' )
 
 
+# this is really complicated so a long comment is in order
+#  we open a whole bunch of files at once and write 1 pdb to each file round-robin
+#  this works until you open too many files and the file system starts complaining
+#  the solution is to open files in batches and then do the round-robin thing
+
+
 total_structures = len(silent_index['tags'])
 num_files = int(math.ceil(total_structures / tags_per))
 
-# This is the part where you're like. Oh yeah, that's a good idea...
 
-files = []
-for name in split_name_gen(num_files):
-    f = open(name + ".silent", "w" )
-    f.write( silent_tools.silent_header(silent_index) )
-    files.append( f )
+max_open_files = 2 #512 - 30 # for systems with 512 limit and a buffer of 30
 
+num_batches = math.ceil( num_files / max_open_files )
+num_open_files = math.ceil( num_files / num_batches )
 
-seek_size = 1000
+all_names = split_name_gen(num_files)
+
 cur_struct = 0
-ifile = 0
 
-while cur_struct < total_structures:
+for file_batch in range(num_batches):
 
-    if ( cur_struct + seek_size > total_structures ):
-        seek_size = total_structures - cur_struct
+    lb = file_batch * num_open_files
+    ub = min( (file_batch + 1) * num_open_files, len(all_names) )
 
-    structures = silent_tools.get_silent_structures_true_slice( open_silent_file, 
-                        silent_index, cur_struct, cur_struct+seek_size, True )
+    files = []
+    for name in all_names[lb:ub]:
+        f = open(name + ".silent", "w" )
+        f.write( silent_tools.silent_header(silent_index) )
+        files.append( f )
 
-    for structure in structures:
-        files[ifile].write(structure)
-        ifile += 1
-        ifile %= num_files
+    cur_struct_max = min( tags_per * ub, total_structures )
 
-    cur_struct += seek_size
+    seek_size = 1000
+    ifile = 0
+
+    while cur_struct < cur_struct_max:
+
+        if ( cur_struct + seek_size > total_structures ):
+            seek_size = total_structures - cur_struct
+
+        structures = silent_tools.get_silent_structures_true_slice( open_silent_file, 
+                            silent_index, cur_struct, cur_struct+seek_size, True )
+
+        for structure in structures:
+            files[ifile].write(structure)
+            ifile += 1
+            ifile %= len(files)
+
+        cur_struct += seek_size
+
+
+
+    for file in files:
+        file.close()
 
 
 open_silent_file.close()
-
-for file in files:
-    file.close()
 
 
 
