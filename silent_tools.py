@@ -249,8 +249,15 @@ def build_silent_index(file):
 
     for line in lines:
         try:
-        # print(line)
+            # eprint(line)
             sp = line.strip().split()
+
+            # this might seem like a weird test, but it catches when awk only gets 1 field
+            if ( sp[0] == sp[1] ):
+                offset = 0 if len(order) == 0 else index[order[-1]]['seek']
+                eprint("silent_tools: corruption: file_offset: %i"%(offset))
+                continue
+
             name = sp[1]
             orig_order.append(name)
             if ( name in index ):
@@ -315,6 +322,15 @@ def validate_silent_index(file, silent_index):
 def file_size(file):
     file = get_real_file(file)
     return int(cmd("du -b %s | awk '{print $1}'"%file).strip())
+
+def silent_header_fix_corrupt(silent_index):
+    use_scoreline = silent_index['scoreline']
+
+    sp = use_scoreline.split()
+    if ( len(sp) < 2 or sp[1] != "score" and sp[1] != "total_score" ):
+        use_scoreline = "SCORE: score description"
+
+    return silent_header_slim(silent_index['sequence'], use_scoreline)
 
 def silent_header(silent_index):
     return silent_header_slim(silent_index['sequence'], silent_index['scoreline'])
