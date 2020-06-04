@@ -27,12 +27,12 @@ SILENT_INDEX_VERSION = "4"
 
 # Returns the silent index which allows rapid
 #  parsing of the silent file
-def get_silent_index(file):
+def get_silent_index(file, accept_garbage=False):
 
     index_name = get_index_name(file)
 
     if ( not os.path.exists( index_name ) ):
-        return build_silent_index(file)
+        return build_silent_index(file, accept_garbage=accept_garbage)
 
     if ( os.path.getmtime(get_real_file(file)) > os.path.getmtime(index_name) ):
         eprint("Silent file newer than index. Rebuilding index!")
@@ -185,7 +185,7 @@ def get_index_name(file):
     return file + ".idx"
 
 
-def assert_is_silent_and_get_scoreline(file, return_f=False):
+def assert_is_silent_and_get_scoreline(file, return_f=False, accept_garbage=False):
     if ( not os.path.exists(file) ):
         sys.exit("silent_tools: Error! Silent file doesn't exist: " + file)
 
@@ -211,7 +211,10 @@ def assert_is_silent_and_get_scoreline(file, return_f=False):
         eprint("silent_tools: Warning! Silent file doesn't have SEQUENCE line")
 
     if ( not line1.startswith("SCORE:" ) ):
-        sys.exit("silent_tools: Error! Silent file doesn't have SCORE: header")
+        if ( accept_garbage ):
+            eprint("silent_tools: Error! Silent file doesn't have SCORE: header")
+        else:
+            sys.exit("silent_tools: Error! Silent file doesn't have SCORE: header")
 
     scoreline = line1
 
@@ -227,13 +230,14 @@ def assert_is_silent_and_get_scoreline(file, return_f=False):
     return scoreline
 
 
-def build_silent_index(file):
+def build_silent_index(file, accept_garbage=False):
 
-    scoreline = assert_is_silent_and_get_scoreline(file)
+    scoreline = assert_is_silent_and_get_scoreline(file, accept_garbage=accept_garbage)
 
 
     # I'm sorry. If you put description in the name of your pose, it will disappear
     lines = cmd2("command grep -a --byte-offset '^SCORE:' %s | grep -v description | tr -d '\r' | awk '{print $1,$NF}'"%file)[0].strip().split("\n")
+
 
     # with open("tmp", "w") as f:
     #     f.write("\n".join(lines))
