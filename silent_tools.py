@@ -38,8 +38,12 @@ def get_silent_index(file, accept_garbage=False):
         eprint("Silent file newer than index. Rebuilding index!")
         return build_silent_index(file)
 
-    with open(index_name) as f:
-        silent_index = json.loads(f.read())
+    try:
+        with open(index_name) as f:
+            silent_index = json.loads(f.read())
+    except:
+        eprint("Silent index is corrupt. Rebuilding index!")
+        return build_silent_index(file)
 
     if ( validate_silent_index(file, silent_index) ):
         return silent_index
