@@ -23,6 +23,14 @@ silent_file = sys.argv[1]
 
 silent_index = silent_tools.get_silent_index( silent_file, accept_garbage=True)
 
+
+is_binary = silent_index['silent_type'] == "BINARY"
+is_protein = silent_index['silent_type'] == "PROTEIN"
+
+if ( not is_binary and not is_protein ):
+    eprint("silentdropcorruptmodels: Unknown silent type. Trying BINARY")
+    is_binary = True
+
 sys.stdout.write( silent_tools.silent_header_fix_corrupt( silent_index ) )
 sys.stdout.flush()
 
@@ -41,12 +49,22 @@ with open(silent_file, errors='ignore') as sf:
         sequence = "".join(sequence_chunks)
         seqlen = len(sequence)
 
+
+        assert( is_binary ^ is_protein )
+
         num_res_lines = 0
         for line in structure:
-            if ( len(line) == 0 ):
-                continue
-            if ( line[0] in "HEL" ):
-                num_res_lines += 1
+            if ( is_binary ):
+                if ( len(line) == 0 ):
+                    continue
+                if ( line[0] in "HEL" ):
+                    num_res_lines += 1
+            if ( is_protein ):
+                if ( len(line) < 6 ):
+                    continue
+                if ( line[5] in "HEL" ):
+                    num_res_lines += 1
+
 
         if ( seqlen != num_res_lines ):
             eprint("silentdropcorruptmodels: Found %5i res expected %5i res: %s"%

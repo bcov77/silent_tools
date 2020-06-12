@@ -23,7 +23,7 @@ import struct
 import bz2
 
 
-SILENT_INDEX_VERSION = "4"
+SILENT_INDEX_VERSION = "5"
 
 # Returns the silent index which allows rapid
 #  parsing of the silent file
@@ -188,6 +188,31 @@ def eprint(*args, **kwargs):
 def get_index_name(file):
     return file + ".idx"
 
+def detect_silent_type(structure):
+    is_binary = False
+    is_protein = False
+    for line in structure:
+        if ( len(line) == 0 ):
+            continue
+        if ( line[0] in "HEL" ):
+            is_binary = True
+        if ( len(line) < 6 ):
+            continue
+        if ( line[5] in "HEL" ):
+            is_protein = True
+
+    if ( is_binary and is_protein ):
+        eprint("silent_tools: Silent file is both BINARY and PROTEIN? Using UNKNOWN")
+        return "UNKNOWN"
+
+    if ( is_binary ):
+        return "BINARY"
+    if ( is_protein ):
+        return "PROTEIN"
+
+    eprint("silent_tools: Can't determine silent type. Using UNKNOWN")
+    return "UNKNOWN"
+
 
 def assert_is_silent_and_get_scoreline(file, return_f=False, accept_garbage=False):
     if ( not os.path.exists(file) ):
@@ -299,14 +324,17 @@ def build_silent_index(file, accept_garbage=False):
                     "unique_tags":unique_tags, "version":SILENT_INDEX_VERSION}
 
     sequence = "A"
+    silent_type = "UNKNOWN"
     if ( len(order) > 0 ):
         try:
             structure = get_silent_structure(file, silent_index, order[0])
             sequence = "".join(get_sequence_chunks(structure))
+            silent_type = detect_silent_type(structure)
         except:
             eprint("Failed to get sequence. Please tell Brian")
 
     silent_index['sequence'] = sequence
+    silent_index['silent_type'] = silent_type
 
 
     try:
@@ -338,13 +366,16 @@ def silent_header_fix_corrupt(silent_index):
     if ( len(sp) < 2 or sp[1] != "score" and sp[1] != "total_score" ):
         use_scoreline = "SCORE: score description"
 
-    return silent_header_slim(silent_index['sequence'], use_scoreline)
+    return silent_header_slim(silent_index['sequence'], use_scoreline, silent_index['silent_type'])
 
 def silent_header(silent_index):
-    return silent_header_slim(silent_index['sequence'], silent_index['scoreline'])
+    return silent_header_slim(silent_index['sequence'], silent_index['scoreline'], silent_index['silent_type'])
 
-def silent_header_slim(sequence, scoreline):
-    return "SEQUENCE: %s\n%s\n"%(sequence, scoreline.strip())
+def silent_header_slim(sequence, scoreline, silent_type):
+    header = "SEQUENCE: %s\n%s\n"%(sequence, scoreline.strip())
+    if ( silent_type != "UNKNOWN" ):
+        header += "REMARK %s SILENTFILE\n"%silent_type
+    return header
 
 
 
@@ -713,6 +744,46 @@ def sketch_get_cas_protein_struct(structure):
     return np.array(cas)
 
 
+def sketch_get_ncac_protein_struct(structure):
+
+    sequence = "".join(get_sequence_chunks(structure))
+
+    ncac = []
+
+    for line in structure:
+        line = line.strip()
+        if (len(line) == 0):
+            continue
+        sp = line.split()
+
+
+        if (len(sp) != 13):
+            continue
+
+        try:
+            seqpos = int(sp[0])
+            if ( not sp[1] in "HEL" ):
+                raise Exception()
+            nx = float(sp[2])
+            ny = float(sp[3])
+            nz = float(sp[4])
+            cax = float(sp[5])
+            cay = float(sp[6])
+            caz = float(sp[7])
+            cx = float(sp[8])
+            cy = float(sp[9])
+            cz = float(sp[10])
+        except:
+            continue
+        ncac.append([nx, ny, nz])
+        ncac.append([cax, cay, caz])
+        ncac.append([cx, cy, cz])
+
+        assert(seqpos*3 == len(ncac))
+
+    assert(len(ncac) == len(sequence)*3)
+
+    return np.array(ncac)
 
 
 
