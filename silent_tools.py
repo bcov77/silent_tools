@@ -265,7 +265,7 @@ def build_silent_index(file, accept_garbage=False):
 
 
     # I'm sorry. If you put description in the name of your pose, it will disappear
-    lines = cmd2("command grep -a --byte-offset '^SCORE:' %s | grep -v description | tr -d '\r' | awk '{print $1,$NF}'"%file)[0].strip().split("\n")
+    lines = cmd2("command grep -a --byte-offset '^SCORE:' %s | grep -va description | tr -d '\r' | awk '{print $1,$NF}'"%file)[0].strip().split("\n")
 
 
     # with open("tmp", "w") as f:
@@ -415,6 +415,33 @@ def get_sequence_chunks(structure, tag="FIXME"):
         last_end = end
 
     return sequence_chunks
+
+def get_chain_ids(structure, tag="FIXME"):
+
+    resnum_line = None
+    for line in structure:
+        if ( line.startswith("RES_NUM") ):
+            resnum_line = line
+            break
+
+    if ( resnum_line is None ):
+        eprint("silent_tools: no RES_NUM for tag %s"%tag)
+        return ""
+
+
+    parts = line.split()
+    usable_parts = [x for x in parts if ":" in x]
+
+    chain_ids = ""
+    for part in usable_parts:
+        idd, rangee = part.split(":")
+        assert(len(idd) == 1)
+
+        start, end = [int(x) for x in rangee.split('-')]
+
+        chain_ids += idd*(end-start + 1)
+
+    return chain_ids
 
 
 ########

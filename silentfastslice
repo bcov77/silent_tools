@@ -32,6 +32,8 @@ for line in sys.stdin.readlines() + sys.argv[2:]:
     for tag in sp:
         tags.append(tag)
 
+if (len(tags) != len(set(tags))):
+    eprint("silentfastslice: Warning: duplicate tags specified")
 
 silent_index = silent_tools.get_silent_index( silent_file )
 

@@ -16,7 +16,7 @@ if (len(sys.argv) == 1):
     eprint('silentoopsscoreslice by bcov - an oops tool that slices by score')
     eprint('   oops tool -- reads file once, because, "oops that\'s a lot of data"')
     eprint("Usage:")
-    eprint("        silentoopsscoreslice myfile.silent \"s[1] < -30 && len(s) == 50\"")
+    eprint("        silentoopsscoreslice myfile.silent \"s[1] < -30 and len(s) == 50\"")
     eprint("             Where s = score_line.split()")
     sys.exit(1)
 
@@ -29,7 +29,7 @@ expression_func = eval("lambda s: " + expression)
 scoreline, f = silent_tools.assert_is_silent_and_get_scoreline(silent_file, True)
 
 
-sys.stdout.write( silent_tools.silent_header_slim( "A", scoreline ) )
+sys.stdout.write( silent_tools.silent_header_slim( "A", scoreline, "BINARY" ) )
 sys.stdout.flush()
 
 have_line = False

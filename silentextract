@@ -24,4 +24,4 @@ command -v extract_pdbs >/dev/null 2>&1 || {
     extract_program=pyextract_pdbs
 }
 
-$extract_program -in:file:silent $silent -in:file:silent_struct_type binary -extra_res_fa /home/bcov/from/jason/H3i.am1bcc.fa.mm.params
+$extract_program -in:file:silent $silent -in:file:silent_struct_type binary
