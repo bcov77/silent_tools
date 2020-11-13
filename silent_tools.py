@@ -730,7 +730,16 @@ def sketch_get_atoms(structure, atom_nums, chains=None):
 
     final = []
     for residue in atoms_by_res:
-        final.append(residue[atom_nums])
+        try:
+            final.append(residue[atom_nums])
+        except:
+            arr = []
+            for atom_num in atom_nums:
+                try:
+                    arr.append(residue[atom_num])
+                except:
+                    arr.append(np.array([np.nan, np.nan, np.nan]))
+            final.append(np.array(arr))
 
     final = np.array(final).reshape(-1, 3)
 
