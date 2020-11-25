@@ -103,7 +103,7 @@ def rip_structure_by_lines(f, first_line, save_structure=True):
     return structure, first_non_structure_line
 
 
-def get_silent_structures_true_slice( f, silent_index, idx_start, idx_stop_py, oneline=False ):
+def get_silent_structures_true_slice( f, silent_index, idx_start, idx_stop_py, oneline=False, raw_string=False ):
     assert( idx_start >= 0 and idx_stop_py <= len(silent_index['index']) )
 
     start_seek = silent_index['index'][silent_index['tags'][idx_start]]['seek']
@@ -119,6 +119,9 @@ def get_silent_structures_true_slice( f, silent_index, idx_start, idx_stop_py, o
         data = f.read()
     else:
         data = f.read(stop_seek - start_seek)
+
+    if ( raw_string ):
+        return data
 
     structures = []
     for idx in range(idx_start, idx_stop_py):
