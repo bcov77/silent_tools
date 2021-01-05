@@ -19,9 +19,9 @@ echo "SEQUENCE: A"
 echo "SCORE: score description"
 
 if [[ $3 -eq -1 ]]; then
-    dd if="$1" iflag=skip_bytes,count_bytes skip=$2
+    dd if="$1" bs=8192 iflag=skip_bytes,count_bytes skip=$2
 else
-    dd if="$1" iflag=skip_bytes,count_bytes skip=$2 count=$3
+    dd if="$1" bs=8192 iflag=skip_bytes,count_bytes skip=$2 count=$3
 fi
 
 
