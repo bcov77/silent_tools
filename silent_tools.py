@@ -68,14 +68,45 @@ def get_silent_structures_file_open( f, silent_index, tags ):
     return structures
 
 
-def get_silent_structure_file_open( f, silent_index, tag ):
+def get_silent_structure_file_open( f, silent_index, tag, return_first_line=False ):
     assert( tag in silent_index['index'] )
     entry = silent_index['index'][tag]
 
     f.seek( entry['seek'] )
 
     first_line = next(f)
-    return rip_structure_by_lines(f, first_line)[0]
+    structure, first_line = rip_structure_by_lines(f, first_line)
+    
+    if ( return_first_line ):
+        return structure, first_line
+    else:
+        return structure
+
+
+# can throw
+def rip_structure_by_lines_arbitrary_start(f, first_line, save_structure=True):
+    while ( not first_line.startswith("SCORE") ):
+        first_line = next(f) # throw
+
+    return rip_structure_by_lines(f, first_line, save_structure=save_structure)
+
+# can throw
+def rip_structures_till(f, first_line, till_structure):
+
+    while True:
+        while ( not first_line.startswith("SCORE") ):
+            first_line = next(f) # throw
+
+        cur_tag = first_line.strip().split()[-1]
+
+        if ( cur_tag == till_structure ):
+            break
+
+        _, first_line = rip_structure_by_lines(f, first_line, save_structure=False)
+
+
+    return rip_structure_by_lines(f, first_line, save_structure=True)
+
 
 
 def rip_structure_by_lines(f, first_line, save_structure=True):
