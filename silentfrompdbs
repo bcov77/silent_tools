@@ -33,12 +33,22 @@ if [ ! -f $tmp_list ]; then
 fi
 
 
+jd2_program=score_jd2
+
+#https://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script/677212#677212
+command -v score_jd2 >/dev/null 2>&1 || { 
+    #echo >&2 "You must have extract_pdbs on your path!"; 
+    #echo >&2 "Try doing cd silent_tools; ln -s /software/rosetta/latest/bin/extract_pdbs ."
+    #exit 1; 
+    jd2_program=pyjd2
+}
+
 
 
 tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_file="tmp_${tmp_file}.silent"
 
-score_jd2 -l $tmp_list -out:file:silent $tmp_file -out:file:silent_struct_type binary -extra_res_fa /home/bcov/from/jason/H3i.am1bcc.fa.mm.params 1>&2
+$jd2_program -l $tmp_list -out:file:silent $tmp_file -out:file:silent_struct_type binary -extra_res_fa /home/bcov/from/jason/H3i.am1bcc.fa.mm.params 1>&2
 
 silentls $tmp_file | sed 's/_0001$//g' | silentrename $tmp_file
 
