@@ -85,7 +85,7 @@ def get_silent_structure_file_open( f, silent_index, tag, return_first_line=Fals
 
 # can throw
 def rip_structure_by_lines_arbitrary_start(f, first_line, save_structure=True):
-    while ( not first_line.startswith("SCORE") ):
+    while ( not first_line.startswith("SCORE") or "description" in first_line ):
         first_line = next(f) # throw
 
     return rip_structure_by_lines(f, first_line, save_structure=save_structure)
@@ -94,7 +94,7 @@ def rip_structure_by_lines_arbitrary_start(f, first_line, save_structure=True):
 def rip_structures_till(f, first_line, till_structure):
 
     while True:
-        while ( not first_line.startswith("SCORE") ):
+        while ( not first_line.startswith("SCORE") or "description" in first_line ):
             first_line = next(f) # throw
 
         cur_tag = first_line.strip().split()[-1]
@@ -111,7 +111,7 @@ def rip_structures_till(f, first_line, till_structure):
 
 def rip_structure_by_lines(f, first_line, save_structure=True):
 
-    assert(first_line.startswith("SCORE"))
+    assert(first_line.startswith("SCORE") and "description" not in first_line)
 
     structure = [first_line] if save_structure else None
 
@@ -394,16 +394,19 @@ def file_size(file):
     return int(cmd("du -b %s | awk '{print $1}'"%file).strip())
 
 def silent_header_fix_corrupt(silent_index):
-    use_scoreline = silent_index['scoreline']
-
-    sp = use_scoreline.split()
-    if ( len(sp) < 2 or sp[1] != "score" and sp[1] != "total_score" ):
-        use_scoreline = "SCORE: score description"
-
-    return silent_header_slim(silent_index['sequence'], use_scoreline, silent_index['silent_type'])
+    return silent_header_fix_corrupt_slim(silent_index['sequence'], silent_index['scoreline'], silent_index['silent_type'])
 
 def silent_header(silent_index):
     return silent_header_slim(silent_index['sequence'], silent_index['scoreline'], silent_index['silent_type'])
+
+
+def silent_header_fix_corrupt_slim(sequence, scoreline, silent_type):
+    sp = scoreline.split()
+    if ( len(sp) < 2 or (sp[1] != "score" and sp[1] != "total_score") ):
+        scoreline = "SCORE: score description"
+
+    return silent_header_slim(sequence, scoreline, silent_type)
+
 
 def silent_header_slim(sequence, scoreline, silent_type):
     header = "SEQUENCE: %s\n%s\n"%(sequence, scoreline.strip())
