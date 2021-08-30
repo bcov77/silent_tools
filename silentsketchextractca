@@ -35,8 +35,8 @@ with open(silent_file, errors='ignore') as sf:
         structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
 
         chunks = silent_tools.get_sequence_chunks(structure)
-        sequence = "".join(chunks[x] for x in [0])
-        cas = silent_tools.sketch_get_atoms(structure, [1], [0])
+        sequence = "".join(chunks[x] for x in list(range(len(chunks))))
+        cas = silent_tools.sketch_get_atoms(structure, [1], list(range(len(chunks))))
 
         lines = silent_tools.write_pdb_atoms( cas, sequence, ["CA"] )
 

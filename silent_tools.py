@@ -536,7 +536,10 @@ def write_pdb_atoms(atoms, sequence, atom_names):
     assert(len(atoms) / len(sequence) == len(atom_names))
 
     for i in range(len(sequence)):
-        name3 = name1_to_name3[sequence[i]]
+        try:
+            name3 = name1_to_name3[sequence[i]]
+        except:
+            name3 = "UNK"
 
         for iatom, atom in enumerate(atom_names):
             atom_offset = i*len(atom_names)+iatom

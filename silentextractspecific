@@ -30,10 +30,14 @@ if [ $# -eq 0 ]; then
     echo >&2 "        cat list_of_tags.list | silentextractspecific myfile.silent"
     echo >&2 "                             or"
     echo >&2 "        silentextractspecific myfile.silent tag1 tag2 tag3"
+    echo >&2 "Flags:"
+    echo >&2 "        -p param_file"
+    echo >&2 "        @flags_file"
     exit 1
 fi
 
 
+source $(dirname $(type -p "$0"))/_helpers/extract_flags.sh
 
 silent=$1
 shift
