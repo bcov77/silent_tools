@@ -31,6 +31,7 @@ if [ $# -eq 0 ]; then
     echo >&2 "                             or"
     echo >&2 "        silentextractspecific myfile.silent tag1 tag2 tag3"
     echo >&2 "Flags:"
+    echo >&2 "        -j cpus"
     echo >&2 "        -p param_file"
     echo >&2 "        @flags_file"
     exit 1
