@@ -453,20 +453,20 @@ def get_sequence_chunks(structure, tag="FIXME"):
 
     return sequence_chunks
 
-def get_chain_ids(structure, tag="FIXME"):
+def get_chain_ids(structure, tag="FIXME", resnum_line=None):
 
-    resnum_line = None
-    for line in structure:
-        if ( line.startswith("RES_NUM") ):
-            resnum_line = line
-            break
+    if ( resnum_line is None ):
+        for line in structure:
+            if ( line.startswith("RES_NUM") ):
+                resnum_line = line
+                break
 
     if ( resnum_line is None ):
         eprint("silent_tools: no RES_NUM for tag %s"%tag)
         return ""
 
 
-    parts = line.split()
+    parts = resnum_line.split()
     usable_parts = [x for x in parts if ":" in x]
 
     chain_ids = ""
@@ -479,6 +479,18 @@ def get_chain_ids(structure, tag="FIXME"):
         chain_ids += idd*(end-start + 1)
 
     return chain_ids
+
+def chain_ids_to_silent_format(chain_ids):
+    parts = []
+    cur_letter = None
+    cur_start = None
+    for i, letter in enumerate(chain_ids + "\n"): # chain id can never be \n
+        if ( letter != cur_letter ):
+            if ( cur_letter != None):
+                parts.append("%s:%i-%i"%(cur_letter, cur_start+1, i))
+            cur_letter = letter
+            cur_start = i
+    return " ".join(parts)
 
 
 ########
