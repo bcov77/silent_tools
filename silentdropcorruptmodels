@@ -57,7 +57,8 @@ with open(silent_file, errors='ignore') as sf:
             if ( is_binary ):
                 if ( len(line) == 0 ):
                     continue
-                if ( line[0] in "HEL" ):
+                sp = line.split()
+                if ( line[0] in "HEL" and len(sp) == 2 and (len(sp[0]) - 1) % 16 == 0):
                     num_res_lines += 1
             if ( is_protein ):
                 if ( len(line) < 6 ):

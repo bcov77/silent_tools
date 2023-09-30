@@ -703,7 +703,47 @@ if not spec is None:
         assert(len(ba) % 4 == 0)
         return ba
 
+    @njit(fastmath=True, cache=True)
+    def inner_get_silent_res_data(ba):
+        line = "L"
 
+        iters = int(np.ceil(len(ba) / 3))
+
+        len_ba = len(ba)
+        for i in range(iters):
+            i0 = 0
+            i1 = 0
+            i2 = 0
+            i0 = ba[i*3+0]
+            if ( i*3 + 1 < len_ba ):
+                i1 = ba[i*3+1]
+            if ( i*3+2 < len_ba ):
+                i2 = ba[i*3+2]
+
+            line += encode_24_to_32(i0, i1, i2)
+
+        return line
+
+    @njit(fastmath=True, cache=True)
+    def code_to_6bit(byte):
+        return silent_chars[byte]
+
+    @njit(fastmath=True, cache=True)
+    def encode_24_to_32(i0, i1, i2):
+        return code_to_6bit( i0 & 63 ) + \
+                code_to_6bit( ((i1 << 2) | (i0 >> 6)) & 63 ) + \
+                code_to_6bit( ((i1 >> 4) | ((i2 << 4) & 63)) & 63 ) + \
+                code_to_6bit( i2 >> 2 )
+
+
+_float_packer_0 = struct.Struct("f")
+def get_silent_res_data(coords):
+
+    ba = bytearray()
+    for coord in coords:
+        ba += _float_packer_0.pack(coord)
+
+    return inner_get_silent_res_data(ba)
 
 
 _float_packer_by_len = None
