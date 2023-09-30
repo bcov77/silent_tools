@@ -62,8 +62,10 @@ Additionally, `silentfrompdbs` and `silentextract` require Rosetta. If you have 
 default python, then you're already good to go. Otherwise you'll need to make some symlinks.
 ```bash
 cd ~/software/silent_tools
-ln -s /my/path/to/rosetta/main/source/bin/score_jd2 .
-ln -s /my/path/to/rosetta/main/source/bin/extract_pdbs .
+# Note that on your system, .linuxgccrelease may be different
+#  Ensure that the first argument in these commands actually exists
+ln -s /my/path/to/rosetta/main/source/bin/score_jd2.linuxgccrelease score_jd2
+ln -s /my/path/to/rosetta/main/source/bin/extract_pdbs.linuxgccrelease extract_pdbs
 ```
 
 # Refresher on Silent Files
