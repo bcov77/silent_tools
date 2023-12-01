@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+import distutils.spawn
+import os
+import sys
+sys.path.append(os.path.dirname(distutils.spawn.find_executable("silent_tools.py")))
+import silent_tools
+from silent_tools import eprint
+import stat
+from collections import defaultdict
+
+# Don't throw an error when someone uses head
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL) 
+
+if (len(sys.argv) == 1):
+    eprint("")
+    eprint('silentmultislice by bcov - a tool to allow you to slice to multiple silent files at once')
+    eprint("Usage:")
+    eprint("        cat tag_col1_dest_col2.list | silentslice myfile.silent > new.silent")
+    eprint("Info:")
+    eprint("        The file you cat into this program should have 2 columns. The first column")
+    eprint("         is the tag, the second column is the destination file.")
+    eprint("Example:")
+    eprint("   tag1 a.silent")
+    eprint("   tag2 a.silent")
+    eprint("   tag3 a.silent")
+    eprint("   tag1 b.silent")
+    eprint("   tag2 b.silent")
+    eprint("   tag3 b.silent")
+    sys.exit(1)
+
+silent_file = sys.argv[1]
+
+tag_buffers = []
+if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
+    tag_buffers += sys.stdin.readlines()
+# tag_buffers += sys.argv[2:]
+
+errors = False
+tags_for_dest = defaultdict(list)
+for line in tag_buffers:
+    line = line.strip()
+    if (len(line) == 0):
+        continue
+    sp = line.split(" ")
+    if len(sp) != 2:
+        eprint("silentmultislice: Error: Line has wrong number of columns:", line)
+        errors = True
+        continue
+    tag, dest = sp
+    tags_for_dest[dest].append(tag)
+
+
+# if (len(tags) != len(set(tags))):
+#     eprint("silentmultislice: Warning: duplicate tags specified")
+
+silent_index = silent_tools.get_silent_index( silent_file )
+
+
+with open(silent_file, errors='ignore') as sf:
+
+    for dest in tags_for_dest:
+        with open(dest, "w") as dest_f:
+
+            dest_f.write( silent_tools.silent_header( silent_index ) )
+            dest_f.flush()
+            tags = tags_for_dest[dest]
+            for tag in tags:
+
+                if ( tag not in silent_index['index'] ):
+                    eprint("silentmultislice: Unable to find tag: %s"%tag)
+                    continue
+                structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
+
+                dest_f.write("".join(structure))
+                dest_f.flush()
+
+
