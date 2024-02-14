@@ -29,8 +29,16 @@ if [ ! -f $tmp_list ]; then
     echo >&2 "        cat list_of_tags.list | silentfrompdbs > silent.silent"
     echo >&2 "                             or"
     echo >&2 "        silentfrompdbs tag1 tag2 tag3 > silent.silent"
+    echo >&2 "Flags:"
+    echo >&2 "        -j cpus"
+    echo >&2 "        -p param_file"
+    echo >&2 "        @flags_file"
     exit 1
 fi
+
+silent_dir="$(dirname $(type -p "$0"))"
+
+source "$silent_dir"/_helpers_silent/extract_flags.sh
 
 
 jd2_program=score_jd2
@@ -40,21 +48,41 @@ command -v score_jd2 >/dev/null 2>&1 || {
     #echo >&2 "You must have extract_pdbs on your path!"; 
     #echo >&2 "Try doing cd silent_tools; ln -s /software/rosetta/latest/bin/extract_pdbs ."
     #exit 1; 
-    jd2_program=pyjd2
+    jd2_program="$silent_dir"/pyjd2
 }
 
 
+if [ -z "${SILENT_J}" ]; then
+# Do single-thread generation
 
-tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
-tmp_file="tmp_${tmp_file}.silent"
+    tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
+    tmp_file="tmp_${tmp_file}.silent"
 
-$jd2_program -l $tmp_list -out:file:silent $tmp_file -out:file:silent_struct_type binary 1>&2
+    $jd2_program -l $tmp_list -out:file:silent $tmp_file -out:file:silent_struct_type binary $SILENT_PARAMS $SILENT_AT 1>&2
 
-silentls $tmp_file | sed 's/_0001$//g' | silentrename $tmp_file
+    "$silent_dir"/silentls $tmp_file | sed 's/_0001$//g' | "$silent_dir"/silentrename $tmp_file
 
-rm $tmp_list
-rm $tmp_file
-rm $tmp_file.idx
+    rm $tmp_list
+    rm $tmp_file
+    rm $tmp_file.idx
 
+else
+# Do multi-thread extraction
+    tmp_fol=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
+    tmp_fol="tmp_${tmp_fol}"
+
+    cpus=${SILENT_J} #$(parallel --number-of-cores)
+
+    splitno=$((( $(wc -l $tmp_list | awk '{print $1}') / $cpus + 1)))
+
+    mkdir $tmp_fol
+
+    split -l $splitno $tmp_list $tmp_fol/x
+
+    ls $tmp_fol/x* | parallel -j$cpus "cat {} | $silent_dir/silentfrompdbs $SILENT_PARAMS $SILENT_AT"
+
+    rm $tmp_list
+    rm -r $tmp_fol
+fi
 
 

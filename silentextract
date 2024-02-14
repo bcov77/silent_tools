@@ -14,25 +14,27 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
-source $(dirname $(type -p "$0"))/_helpers/extract_flags.sh
+silent_dir="$(dirname $(type -p "$0"))"
+
+source "$silent_dir"/_helpers_silent/extract_flags.sh
 
 silent=$1
 
-extract_program=extract_pdbs
+extract_program="$silent_dir"/extract_pdbs
 
 #https://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script/677212#677212
 command -v extract_pdbs >/dev/null 2>&1 || { 
     #echo >&2 "You must have extract_pdbs on your path!"; 
     #echo >&2 "Try doing cd silent_tools; ln -s /software/rosetta/latest/bin/extract_pdbs ."
     #exit 1; 
-    extract_program=pyextract_pdbs
+    extract_program="$silent_dir"/pyextract_pdbs
 }
 
 
 
 if [ -z "${SILENT_J}" ]; then
 # Do single-thread extraction
-    $extract_program -in:file:silent $silent -in:file:silent_struct_type binary $SILENT_PARAMS $SILENT_AT
+    "$extract_program" -in:file:silent $silent -in:file:silent_struct_type binary $SILENT_PARAMS $SILENT_AT
 else
 # Do multi-thread extraction
 
@@ -44,15 +46,15 @@ else
 
     cpus=${SILENT_J}
 
-    silentls $silent > $tmp_list
+    "$silent_dir"/silentls $silent > $tmp_list
 
     splitno=$((( $(wc -l $tmp_list | awk '{print $1}') / $cpus + 1)))
 
     split -l $splitno $tmp_list $tmp_fol/x
 
-    ls $tmp_fol/x* | parallel -j$cpus "cat {} | silentslice $silent > {}.silent"
+    ls $tmp_fol/x* | parallel -j$cpus "cat {} | $silent_dir/silentslice $silent > {}.silent"
 
-    ls $tmp_fol/x*.silent | parallel -j$cpus 'silentextract {}'
+    ls $tmp_fol/x*.silent | parallel -j$cpus "$silent_dir/silentextract {}"
 
     rm $tmp_list
     rm -r $tmp_fol

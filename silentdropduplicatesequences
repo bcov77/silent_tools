@@ -12,17 +12,19 @@ fi
 
 silent=$1
 
+silent_dir="$(dirname $(type -p "$0"))"
+
 
 tmp_name=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 
-silentsequence $silent > $tmp_name.seq
+"$silent_dir"/silentsequence $silent > $tmp_name.seq
 # merge all columns except last one
 #   (Find all columns that have a space before and after 
 #    and delete the space before. )
 perl -pi -e 's/ ([^ ]+)(?= )/\1/g' $tmp_name.seq
 
 # Get unique lines and slice
-sort -k1 $tmp_name.seq | sort -uk1,1 $tmp_name.seq | awk '{print $2}' | silentslice $1
+sort -k1 $tmp_name.seq | sort -uk1,1 $tmp_name.seq | awk '{print $2}' | "$silent_dir"/silentslice $1
 
 rm $tmp_name.seq
 

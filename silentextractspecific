@@ -38,7 +38,9 @@ if [ $# -eq 0 ]; then
 fi
 
 
-source $(dirname $(type -p "$0"))/_helpers/extract_flags.sh
+silent_dir="$(dirname $(type -p "$0"))"
+
+source "$silent_dir"/_helpers_silent/extract_flags.sh
 
 silent=$1
 shift
@@ -55,9 +57,9 @@ fi
 tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_file="tmp_${tmp_file}.silent"
 
-echo "$tags" | silentslice $silent > $tmp_file
+echo "$tags" | "$silent_dir"/silentslice $silent > $tmp_file
 
-silentextract $tmp_file
+"$silent_dir"/silentextract $tmp_file
 
 rm $tmp_file
 

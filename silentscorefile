@@ -15,7 +15,9 @@ if [[ ! -f $1 ]]; then
     exit 1
 fi
 
-silentassertuniquetags $1
+silent_dir="$(dirname $(type -p "$0"))"
+
+"$silent_dir"/silentassertuniquetags $1
 
 silentname=$(basename $1 .silent)
 scorename=${silentname}.sc
