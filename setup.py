@@ -1,6 +1,7 @@
 from setuptools import setup
 
 import glob
+import os
 
 folder = os.path.dirname(os.path.realpath(__file__))
 
@@ -13,17 +14,17 @@ for file in glob.glob(folder + "/silent*"):
       continue
    silent_exe.append(file)
 
-__version__ = "1.0"
+__version__ = "1.0.0"
 
 setup(
    name='silent_tools',
-   version='1.0',
+   version='1.0.0',
    description='A bunch of shell utilities for dealing with silent files',
    license='MIT',
    author='Brian Coventry',
    author_email='bcoventry77@gmail.com',
    url="https://github.com/bcov77/silent_tools",
-   download_url="https://github.com/bcov77/silent_tools/archive/refs/tags/v1.0.tar.gz",
+   download_url="https://github.com/bcov77/silent_tools/archive/refs/tags/v1.0.0.tar.gz",
    packages=['_helpers_silent'],  #same as name
    py_modules=['silent_tools'],
    install_requires=['numpy'], #external packages as dependencies

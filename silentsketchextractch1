@@ -33,7 +33,7 @@ silent_index = silent_tools.get_silent_index( silent_file )
 sys.stdout.write( silent_tools.silent_header( silent_index ) )
 sys.stdout.flush()
 
-annotated_seq_re = re.compile("([^][ ]([[][^]]*[]])?)") # A letter followed by an optional [expression]
+annotated_seq_re = re.compile(r"([A-Za-z]([\[][^\]]+[\]])?)") # A letter followed by an optional [expression]
 
 
 with open(silent_file, errors='ignore') as sf:
