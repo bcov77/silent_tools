@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+
+import os
+import sys
+# if you pip installed this is wrong but you have silent_tools installed anyways
+silent_tools_dir = os.path.dirname(os.path.realpath(__file__))
+if silent_tools_dir not in sys.path:
+    sys.path.append(silent_tools_dir)
+
+import silent_tools
+from silent_tools import eprint
+import stat
+import math
+import shutil
+
+# Don't throw an error when someone uses head
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL) 
+
+
+
+pdb_buffers = []
+if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
+    pdb_buffers += sys.stdin.readlines()
+pdb_buffers += sys.argv[1:]
+
+if (len(pdb_buffers) == 0):
+    eprint("")
+    eprint('silentsketchfrompdbs by bcov - generates a silent from from pdbs WITHOUT rosetta')
+    eprint("Usage:")
+    eprint("        cat list_of_pdbs.list | silentsketchfrompdbs > new.silent")
+    eprint("                             or")
+    eprint("        silentslicefast 1.pdb 2.pdb 3.pdb > new.silent")
+    eprint("Flags:")
+    eprint("        -j cpus")
+    sys.exit(1)
+
+
+pdbs = []
+for line in pdb_buffers:
+    line = line.strip()
+    if (len(line) == 0):
+        continue
+    sp = line.split(" ")
+    for pdb in sp:
+        pdbs.append(pdb)
+
+j_flag = None
+for i in range(len(pdbs)-1, -1, -1):
+    elem = pdbs[i]
+    if elem[0] != '-':
+        continue
+    if elem[1] == 'j':
+        if len(elem) == 2:
+            if i == len(pdbs) - 1:
+                assert False, 'silentsketchfrompdbs: Error, no argument for -j'
+            else:
+                j_flag = int(pdbs[i+1])
+                pdbs.pop(i+1)
+                pdbs.pop(i)
+        else:
+            j_flag = int(elem[2:])
+            pdbs.pop(i)
+        break
+    assert False, 'silentsketchfrompdbs: Unknown flag ' + elem
+
+
+
+if j_flag is not None:
+    this_file = os.path.realpath(__file__)
+    tmp_dir = 'tmp_' + silent_tools.random_string(13)
+    os.mkdir(tmp_dir)
+    per_file = int(math.ceil( len(pdbs) / j_flag ))
+    for i in range(j_flag):
+        file = os.path.join(tmp_dir, 'tmp_%i.list'%i)
+        with open(file, 'w') as f:
+            f.write('\n'.join(pdbs[i*per_file:(i+1)*per_file]))
+            f.write('\n')
+    stdout, stderr, code = silent_tools.cmd2(f'ls {tmp_dir}/tmp* | parallel -j{j_flag} "cat {{}} | {this_file}"')
+    try:
+        shutil.rmtree(tmp_dir)
+    except:
+        pass
+    if len(stdout.strip()) > 0:
+        print(stdout.strip())
+    if len(stderr.strip()) > 0:
+        eprint(stderr.strip())
+    sys.exit(code)
+
+
+
+
+pre_tags = [os.path.basename(pdbs) for pdbs in pdbs]
+
+if (len(pdbs) != len(set(pdbs))):
+    eprint("silentfastslice: Warning: %i duplicate paths specified"%(len(pdbs) - len(set(pdbs))))
+
+if (len(pre_tags) != len(set(pre_tags))):
+    eprint("silentfastslice: Warning: %i paths have duplicate names/tags. Going to rename duplicates to _1"%(len(pre_tags) - len(set(pre_tags))))
+
+
+
+dup_index = {}
+all_tags = set()
+
+first = True
+for pdb in pdbs:
+    tag = os.path.basename(pdb)
+    if tag.endswith('.gz'):
+        tag = tag[:-len('.gz')]
+    if tag.endswith(".pdb"):
+        tag = tag[:-len('.pdb')]
+
+    # Deal with duplicate names
+    if tag in all_tags:
+        if tag in dup_index:
+            number = dup_index[tag]
+        else:
+            number = 1
+
+        while tag + "_%i"%number in all_tags:
+            number += 1
+
+        dup_index[tag] = number
+
+        tag = tag + "_%i"%number
+
+    all_tags.add(tag)
+
+    if not os.path.exists(pdb):
+        eprint("silentsketchfrompdbs: Error! pdb does not exist:", pdb)
+        continue
+
+    try:
+        pdb_lines = open(pdb).readlines()
+    except:
+        eprint("silentsketchfrompdbs: Error! pdb couldn't be opened", pdb)
+        continue
+
+    sys.stdout.write(''.join(silent_tools.pdb_to_structure(pdb_lines, tag, write_header=first )))
+    sys.stdout.flush()
+    first = False
+
+
+

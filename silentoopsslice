@@ -1,0 +1,68 @@
+#!/usr/bin/env python
+
+import os
+import sys
+# if you pip installed this is wrong but you have silent_tools installed anyways
+silent_tools_dir = os.path.dirname(os.path.realpath(__file__))
+if silent_tools_dir not in sys.path:
+    sys.path.append(silent_tools_dir)
+
+import silent_tools
+from silent_tools import eprint
+import stat
+
+# Don't throw an error when someone uses head
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL) 
+
+if (len(sys.argv) == 1):
+    eprint("")
+    eprint('silentoopslice by bcov - an oops tool like silentslice')
+    eprint('   oops tool -- reads file once, because, "oops that\'s a lot of data"')
+    eprint("Usage:")
+    eprint("        cat list_of_tags.list | silentslicefast myfile.silent > new.silent")
+    eprint("                             or")
+    eprint("        silentslicefast myfile.silent tag1 tag2 tag3 > new.silent")
+    sys.exit(1)
+
+silent_file = sys.argv[1]
+
+tag_buffers = []
+if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
+    tag_buffers += sys.stdin.readlines()
+tag_buffers += sys.argv[2:]
+
+tags = set()
+for line in tag_buffers:
+    line = line.strip()
+    if (len(line) == 0):
+        continue
+    sp = line.split(" ")
+    for tag in sp:
+        tags.add(tag)
+
+scoreline, f = silent_tools.assert_is_silent_and_get_scoreline(silent_file, return_f=True)
+
+sys.stdout.write( silent_tools.silent_header_slim( "A", scoreline, "BINARY" ) )
+sys.stdout.flush()
+
+first_line = None
+try:
+    first_line = next(f)
+except:
+    pass
+
+while (not first_line is None):
+    # try:
+    structure, first_line = silent_tools.rip_structure_by_lines_arbitrary_start(f, first_line)
+    # except:
+    #     break
+
+    tag = structure[0].split()[-1]
+
+    if ( tag not in tags ):
+        continue
+
+
+    sys.stdout.write("".join(structure))
+    sys.stdout.flush()
