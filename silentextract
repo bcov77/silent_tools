@@ -16,11 +16,14 @@ fi
 
 silent_dir="$(dirname $(type -p "$0"))"
 
-source "$silent_dir"/_helpers_silent/extract_flags.sh
+source "$silent_dir"/_extract_flags.sh
 
 silent=$1
 
-extract_program="$silent_dir"/extract_pdbs
+# bakerlab stuff. Appologies to others but this fixes so many problems for us
+PATH="$PATH:/software/rosetta/latest/bin"
+
+extract_program=extract_pdbs
 
 #https://stackoverflow.com/questions/592620/how-to-check-if-a-program-exists-from-a-bash-script/677212#677212
 command -v extract_pdbs >/dev/null 2>&1 || { 
@@ -34,7 +37,7 @@ command -v extract_pdbs >/dev/null 2>&1 || {
 
 if [ -z "${SILENT_J}" ]; then
 # Do single-thread extraction
-    "$extract_program" -in:file:silent $silent -in:file:silent_struct_type binary $SILENT_PARAMS $SILENT_AT
+    "$extract_program" -in:file:silent $silent -in:file:silent_struct_type binary $SILENT_PARAMS $SILENT_AT 1>&2
 else
 # Do multi-thread extraction
 
@@ -54,7 +57,7 @@ else
 
     ls $tmp_fol/x* | parallel -j$cpus "cat {} | $silent_dir/silentslice $silent > {}.silent"
 
-    ls $tmp_fol/x*.silent | parallel -j$cpus "$silent_dir/silentextract {}"
+    ls $tmp_fol/x*.silent | parallel -j$cpus "$silent_dir/silentextract $SILENT_FLAGS_NO_J {}"
 
     rm $tmp_list
     rm -r $tmp_fol

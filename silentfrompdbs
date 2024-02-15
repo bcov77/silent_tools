@@ -17,6 +17,10 @@ if [ -p /dev/stdin ]; then
 
 fi
 
+silent_dir="$(dirname $(type -p "$0"))"
+source "$silent_dir"/_extract_flags.sh
+
+
 for tag in "$@"; do
     echo $tag
 done >> $tmp_list
@@ -36,10 +40,8 @@ if [ ! -f $tmp_list ]; then
     exit 1
 fi
 
-silent_dir="$(dirname $(type -p "$0"))"
-
-source "$silent_dir"/_helpers_silent/extract_flags.sh
-
+# bakerlab stuff. Appologies to others but this fixes so many problems for us
+PATH="$PATH:/software/rosetta/latest/bin"
 
 jd2_program=score_jd2
 
@@ -79,7 +81,7 @@ else
 
     split -l $splitno $tmp_list $tmp_fol/x
 
-    ls $tmp_fol/x* | parallel -j$cpus "cat {} | $silent_dir/silentfrompdbs $SILENT_PARAMS $SILENT_AT"
+    ls $tmp_fol/x* | parallel -j$cpus "cat {} | $silent_dir/silentfrompdbs $SILENT_FLAGS_NO_J"
 
     rm $tmp_list
     rm -r $tmp_fol

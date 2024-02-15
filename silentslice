@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
-import distutils.spawn
 import os
 import sys
-sys.path.append(os.path.dirname(distutils.spawn.find_executable("silent_tools.py")))
+# if you pip installed this is wrong but you have silent_tools installed anyways
+silent_tools_dir = os.path.dirname(os.path.realpath(__file__))
+if silent_tools_dir not in sys.path:
+    sys.path.append(silent_tools_dir)
+
 import silent_tools
 from silent_tools import eprint
 import stat
@@ -12,21 +15,38 @@ import stat
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE, SIG_DFL) 
 
-if (len(sys.argv) == 1):
+
+all_args = sys.argv[1:]
+e_flag = False
+for i in range(len(all_args)-1, -1, -1):
+    elem = all_args[i]
+    if elem[0] != '-':
+        continue
+    if elem[1] == 'e':
+        e_flag = True
+        all_args.pop(i)
+        break
+    assert False, 'silentslice: Unknown flag ' + elem
+
+
+
+if (len(all_args) == 0):
     eprint("")
     eprint('silentslice by bcov - a tool to allow you extract a smaller silent file from a larger one')
     eprint("Usage:")
     eprint("        cat list_of_tags.list | silentslice myfile.silent > new.silent")
     eprint("                             or")
     eprint("        silentslice myfile.silent tag1 tag2 tag3 > new.silent")
+    eprint("Flags:")
+    eprint("        -e Old behavior that preserves input order of tags (new way is file-order which is faster")
     sys.exit(1)
 
-silent_file = sys.argv[1]
+silent_file = all_args[0]
 
 tag_buffers = []
 if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
     tag_buffers += sys.stdin.readlines()
-tag_buffers += sys.argv[2:]
+tag_buffers += all_args[1:]
 
 tags = []
 for line in tag_buffers:
@@ -44,6 +64,17 @@ silent_index = silent_tools.get_silent_index( silent_file )
 
 sys.stdout.write( silent_tools.silent_header( silent_index ) )
 sys.stdout.flush()
+
+if not e_flag:
+    existing_tags = []
+    for tag in tags:
+        if ( tag not in silent_index['index'] ):
+            eprint("silentslice: Unable to find tag: %s"%tag)
+            continue
+        else:
+            existing_tags.append(tag)
+
+    tags = sorted(existing_tags, key=lambda x: silent_index['index'][x]['seek'])
 
 with open(silent_file, errors='ignore') as sf:
     for tag in tags:

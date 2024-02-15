@@ -13,6 +13,10 @@ if [ -p /dev/stdin ]; then
 
 fi
 
+silent_dir="$(dirname $(type -p "$0"))"
+source "$silent_dir"/_extract_flags.sh
+
+
 for tag in "$@"; do
     echo $tag
 done >> $tmp_list
@@ -34,10 +38,11 @@ if [ ! -f $tmp_list ]; then
     exit 1
 fi
 
-silent_dir="$(dirname $(type -p "$0"))"
 
 if [ -z "${SILENT_J}" ]; then
-    cat $tmp_list | "$silent_dir"/silentfrompdbs -j16 "$@"
+    cat $tmp_list | "$silent_dir"/silentfrompdbs -j16 $SILENT_FLAGS
 else
-    cat $tmp_list | "$silent_dir"/silentfrompdbs "$@"
+    cat $tmp_list | "$silent_dir"/silentfrompdbs $SILENT_FLAGS
 fi
+
+rm $tmp_list

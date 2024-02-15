@@ -22,7 +22,7 @@ fi
 
 silent_dir="$(dirname $(type -p "$0"))"
 
-source "$silent_dir"/_helpers_silent/extract_flags.sh
+source "$silent_dir"/_extract_flags.sh
 
 if [ ! -f $1 ]; then
     echo >&2 "silentextractparallel: $1 doesn't exist!"
@@ -30,9 +30,9 @@ if [ ! -f $1 ]; then
 fi
 
 if [ -z "${SILENT_J}" ]; then
-    "$silent_dir"/silentextract -j16 "$@"
+    "$silent_dir"/silentextract -j16 $SILENT_FLAGS_NO_J "$@"
 else
-    "$silent_dir"/silentextract "$@"
+    "$silent_dir"/silentextract $SILENT_FLAGS_NO_J "$@"
 fi
 
 

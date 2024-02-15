@@ -40,7 +40,7 @@ fi
 
 silent_dir="$(dirname $(type -p "$0"))"
 
-source "$silent_dir"/_helpers_silent/extract_flags.sh
+source "$silent_dir"/_extract_flags.sh
 
 silent=$1
 shift
@@ -54,13 +54,15 @@ if [ -z "$tags" ]; then
 fi
 
 
+
 tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
 tmp_file="tmp_${tmp_file}.silent"
 
 echo "$tags" | "$silent_dir"/silentslice $silent > $tmp_file
 
-"$silent_dir"/silentextract $tmp_file
+"$silent_dir"/silentextract $SILENT_FLAGS $tmp_file
 
 rm $tmp_file
+rm $tmp_file.idx 2>/dev/null
 
 

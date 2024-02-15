@@ -3,24 +3,26 @@ from __future__ import print_function
 
 # a collection of python routines to deal with silent files that don't require pyrosetta
 
-# Add the silent_tools folder to your path, and then do this to import silent tools
-
-#import distutils
-#import os
-#import sys
-#sys.path.append(os.path.dirname(distutils.spawn.find_executable("silent_tools.py")))
-#import silent_tools
-
 import os
 import sys
 import subprocess
 import json
 from collections import defaultdict
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
+# os.environ["OPENBLAS_NUM_THREADS"] = "1"
 import numpy as np
 import re
 import struct
 import bz2
+import random
+import string
+
+from _helpers_silent.rosetta_util import (format_atom, write_pdb_atoms, code_from_6bit, decode_32_to_24,
+            decode6bit, code_from_6bit, decode_32_to_24, decode6bit,
+            get_silent_res_data, chain_ids_to_silent_format,
+            silent_line_to_atoms, get_chains_mask,
+            sketch_get_cas_protein_struct, sketch_get_ncac_protein_struct,
+            pdb_to_structure, structure_to_pdb
+            )
 
 
 SILENT_INDEX_VERSION = "5"
@@ -408,6 +410,9 @@ def silent_header_fix_corrupt_slim(sequence, scoreline, silent_type):
     return silent_header_slim(sequence, scoreline, silent_type)
 
 
+def silent_blank_header():
+    return silent_header_slim('A', 'SCORE:     score description', 'BINARY')
+
 def silent_header_slim(sequence, scoreline, silent_type):
     header = "SEQUENCE: %s\n%s\n"%(sequence, scoreline.strip())
     if ( silent_type != "UNKNOWN" ):
@@ -480,303 +485,13 @@ def get_chain_ids(structure, tag="FIXME", resnum_line=None):
 
     return chain_ids
 
-def chain_ids_to_silent_format(chain_ids):
-    parts = []
-    cur_letter = None
-    cur_start = None
-    for i, letter in enumerate(chain_ids + "\n"): # chain id can never be \n
-        if ( letter != cur_letter ):
-            if ( cur_letter != None):
-                parts.append("%s:%i-%i"%(cur_letter, cur_start+1, i))
-            cur_letter = letter
-            cur_start = i
-    return " ".join(parts)
 
 
-########
-# Everything below this point is a little sketchy
+def random_string(chars):
+    return ''.join(random.choices(string.ascii_lowercase, k=chars))
 
 
 
-_atom_record_format = (
-    "ATOM  {atomi:5d} {atomn:^4}{idx:^1}{resn:3s} {chain:1}{resi:4d}{insert:1s}   "
-    "{x:8.3f}{y:8.3f}{z:8.3f}{occ:6.2f}{b:6.2f}\n"
-)
-def format_atom(
-        atomi=0,
-        atomn='ATOM',
-        idx=' ',
-        resn='RES',
-        chain='A',
-        resi=0,
-        insert=' ',
-        x=0,
-        y=0,
-        z=0,
-        occ=1,
-        b=0
-):
-    return _atom_record_format.format(**locals())
-
-
-
-name1_to_name3 = {
-    "R":"ARG",
-    "K":"LYS",
-    "N":"ASN",
-    "D":"ASP",
-    "E":"GLU",
-    "Q":"GLN",
-    "H":"HIS",
-    "P":"PRO",
-    "Y":"TYR",
-    "W":"TRP",
-    "S":"SER",
-    "T":"THR",
-    "G":"GLY",
-    "A":"ALA",
-    "M":"MET",
-    "C":"CYS",
-    "F":"PHE",
-    "L":"LEU",
-    "V":"VAL",
-    "I":"ILE",
-}
-
-def write_pdb_atoms(atoms, sequence, atom_names):
-    lines = []
-    assert(len(atoms) / len(sequence) == len(atom_names))
-
-    for i in range(len(sequence)):
-        try:
-            name3 = name1_to_name3[sequence[i]]
-        except:
-            name3 = "UNK"
-
-        for iatom, atom in enumerate(atom_names):
-            atom_offset = i*len(atom_names)+iatom
-            a = atoms[atom_offset]
-
-            lines.append( format_atom( 
-                    atomi=(atom_offset)%100000,
-                    resn=name3,
-                    resi=(i+1)%10000,
-                    atomn=atom_names[iatom],
-                    x=a[0],
-                    y=a[1],
-                    z=a[2]
-                    ))
-
-    return lines
-
-
-
-#########
-# Everything below this point is sketchy
-
-
-
-
-
-silent_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-
-
-def code_from_6bit(_8bit):
-    _8bit = ord(_8bit[0])
-    if ( ( _8bit >= ord('A')) and (_8bit <= ord('Z')) ): return _8bit - ord('A')
-    if ( ( _8bit >= ord('a')) and (_8bit <= ord('z')) ): return _8bit - ord('a') + 26
-    if ( ( _8bit >= ord('0')) and (_8bit <= ord('9')) ): return _8bit - ord('0') + 52
-    if (   _8bit == ord('+')  ): return 62
-    return 63
-
-
-def decode_32_to_24( i0, i1, i2, i3 ):
-    i0 = code_from_6bit( i0 )
-    i1 = code_from_6bit( i1 )
-    i2 = code_from_6bit( i2 )
-    i3 = code_from_6bit( i3 )
-
-    o0 = 0xFF & (i0 | (i1 << 6))
-    o1 = 0xFF & ((i1 >> 2) | (i2 << 4))
-    o2 = 0xFF & ((i3 << 2) | (i2 >> 4))
-
-    return o0, o1, o2
-
-def decode6bit( jar ):
-
-    ba = bytearray()
-
-    valid_bits = 0
-    i = 0
-    while ( i < len(jar) ):
-
-        this_str = ["!", "!", "!", "!"]
-
-        j = 0
-        while ( i < len(jar) and j < 4 ):
-            this_str[j] = jar[i]
-            i += 1
-            j += 1
-            valid_bits += 6
-
-        # print(this_str)
-        bytess = decode_32_to_24(*this_str)
-        # print(bytess)
-
-        ba.append(bytess[0])
-        ba.append(bytess[1])
-        ba.append(bytess[2])
-    valid_bytes = int( valid_bits / 8 )
-    ba = ba[:valid_bytes]
-    assert(len(ba) % 4 == 0)
-    return ba
-
-
-import importlib.util
-package_name = 'numba'
-spec = importlib.util.find_spec(package_name)
-if not spec is None:
-    
-    from numba import njit
-
-
-    @njit(fastmath=True)
-    def code_from_6bit(_8bit):
-
-        if ( ( _8bit >= 65) and (_8bit <= 90) ): return _8bit - 65
-        if ( ( _8bit >= 97) and (_8bit <= 122) ): return _8bit - 97 + 26
-        if ( ( _8bit >= 48) and (_8bit <= 57) ): return _8bit - 48 + 52
-        if (   _8bit == 43  ): return 62
-        return 63
-
-
-    @njit(fastmath=True)
-    def decode_32_to_24( i0, i1, i2, i3 ):
-        i0 = code_from_6bit( i0 )
-        i1 = code_from_6bit( i1 )
-        i2 = code_from_6bit( i2 )
-        i3 = code_from_6bit( i3 )
-
-        o0 = 0xFF & (i0 | (i1 << 6))
-        o1 = 0xFF & ((i1 >> 2) | (i2 << 4))
-        o2 = 0xFF & ((i3 << 2) | (i2 >> 4))
-
-        return o0, o1, o2
-
-    scr = np.zeros(1000, np.byte)
-    def decode6bit( jar ):
-        return numba_decode6bit( jar.encode(), scr )
-
-    @njit(fastmath=True)
-    def numba_decode6bit( jar, ba ):
-        ba_len = 0
-
-        this_str = np.zeros(4, np.byte)
-
-        valid_bits = 0
-        i = 0
-        while ( i < len(jar) ):
-
-            this_str[0] = 0
-            this_str[1] = 0
-            this_str[2] = 0
-            this_str[3] = 0
-
-            j = 0
-            while ( i < len(jar) and j < 4 ):
-                this_str[j] = jar[i]
-                i += 1
-                j += 1
-                valid_bits += 6
-
-            # print(this_str)
-            o0, o1, o2 = decode_32_to_24(this_str[0], this_str[1], this_str[2], this_str[3])
-            # print(bytess)
-
-            ba[ba_len] = o0
-            ba[ba_len+1] = o1
-            ba[ba_len+2] = o2
-            ba_len += 3
-        valid_bytes = int( valid_bits / 8 )
-        ba = ba[:valid_bytes]
-        assert(len(ba) % 4 == 0)
-        return ba
-
-    @njit(fastmath=True, cache=True)
-    def inner_get_silent_res_data(ba):
-        line = "L"
-
-        iters = int(np.ceil(len(ba) / 3))
-
-        len_ba = len(ba)
-        for i in range(iters):
-            i0 = 0
-            i1 = 0
-            i2 = 0
-            i0 = ba[i*3+0]
-            if ( i*3 + 1 < len_ba ):
-                i1 = ba[i*3+1]
-            if ( i*3+2 < len_ba ):
-                i2 = ba[i*3+2]
-
-            line += encode_24_to_32(i0, i1, i2)
-
-        return line
-
-    @njit(fastmath=True, cache=True)
-    def code_to_6bit(byte):
-        return silent_chars[byte]
-
-    @njit(fastmath=True, cache=True)
-    def encode_24_to_32(i0, i1, i2):
-        return code_to_6bit( i0 & 63 ) + \
-                code_to_6bit( ((i1 << 2) | (i0 >> 6)) & 63 ) + \
-                code_to_6bit( ((i1 >> 4) | ((i2 << 4) & 63)) & 63 ) + \
-                code_to_6bit( i2 >> 2 )
-
-
-_float_packer_0 = struct.Struct("f")
-def get_silent_res_data(coords):
-
-    ba = bytearray()
-    for coord in coords:
-        ba += _float_packer_0.pack(coord)
-
-    return inner_get_silent_res_data(ba)
-
-
-_float_packer_by_len = None
-def silent_line_to_atoms(line):
-    global _float_packer_by_len
-    if ( _float_packer_by_len is None ):
-        _float_packer_by_len = []
-        for i in range(1000):
-            _float_packer_by_len.append(struct.Struct("f"*(i)))
-
-
-    ba = decode6bit( line )
-
-    float_packer = _float_packer_by_len[len(ba)//4] #struct.Struct("f"*(len(ba)//4))
-
-    floats = float_packer.unpack(ba)
-
-    assert(len(floats) % 3 == 0)
-
-    return np.array(floats).reshape(-1, 3)
-
-
-def get_chains_mask(chunks, chains):
-    sequence = "".join(chunks)
-    if ( chains is None ):
-        mask = np.ones(len(sequence))
-    else:
-        mask = np.zeros(len(sequence))
-        for chain in chains:
-            lb = np.sum([len(chunk) for chunk in chunks[:chain]]).astype(int)
-            ub = np.sum([len(chunk) for chunk in chunks[:chain+1]]).astype(int)
-            mask[lb:ub] = True
-    return mask
 
 
 def sketch_get_atoms_by_residue(structure, chains=None):
@@ -836,98 +551,5 @@ def sketch_get_atoms(structure, atom_nums, chains=None):
     final = np.array(final).reshape(-1, 3)
 
     return final
-
-
-def sketch_get_cas_protein_struct(structure):
-
-    sequence = "".join(get_sequence_chunks(structure))
-
-    cas = []
-
-    for line in structure:
-        line = line.strip()
-        if (len(line) == 0):
-            continue
-        sp = line.split()
-
-
-        if (len(sp) != 13):
-            continue
-
-        try:
-            seqpos = int(sp[0])
-            if ( not sp[1] in "HEL" ):
-                raise Exception()
-            x = float(sp[5])
-            y = float(sp[6])
-            z = float(sp[7])
-        except:
-            continue
-        cas.append([x, y, z])
-
-        assert(seqpos == len(cas))
-
-    assert(len(cas) == len(sequence))
-
-    return np.array(cas)
-
-
-def sketch_get_ncac_protein_struct(structure):
-
-    sequence = "".join(get_sequence_chunks(structure))
-
-    ncac = []
-
-    for line in structure:
-        line = line.strip()
-        if (len(line) == 0):
-            continue
-        sp = line.split()
-
-
-        if (len(sp) != 13):
-            continue
-
-        try:
-            seqpos = int(sp[0])
-            if ( not sp[1] in "HEL" ):
-                raise Exception()
-            nx = float(sp[2])
-            ny = float(sp[3])
-            nz = float(sp[4])
-            cax = float(sp[5])
-            cay = float(sp[6])
-            caz = float(sp[7])
-            cx = float(sp[8])
-            cy = float(sp[9])
-            cz = float(sp[10])
-        except:
-            continue
-        ncac.append([nx, ny, nz])
-        ncac.append([cax, cay, caz])
-        ncac.append([cx, cy, cz])
-
-        assert(seqpos*3 == len(ncac))
-
-    assert(len(ncac) == len(sequence)*3)
-
-    return np.array(ncac)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
