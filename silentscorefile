@@ -3,7 +3,7 @@
 if [ $# -ne 1 ]; then
     echo >&2 "silentscorefile by bcov - a tool to extract a scorefile from a silentfile"
     echo >&2 "Usage:"
-    echo >&2 "        silentscorefile myfile.silent"
+    echo >&2 "        silentscorefile myfile.silent [new_name.sc]"
     echo >&2 ""
     echo >&2 "Note: This utility ensures that all score lines contain the same elements in"
     echo >&2 "       the same order. If this is not the case, multiple scorefiles are produced"
@@ -19,7 +19,10 @@ silent_dir="$(dirname $(type -p "$0"))"
 
 "$silent_dir"/silentassertuniquetags $1
 
-silentname=$(basename $1 .silent)
+#remove silent extension
+defaultnewsilentname=${1%.silent}
+#use the user specified silent name or the default if the user specifed is not given
+silentname=${2:-$defaultnewsilentname}
 scorename=${silentname}.sc
 
 # tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
