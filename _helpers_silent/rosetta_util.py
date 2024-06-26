@@ -651,7 +651,9 @@ def structure_to_pdb(structure, renumber_resno_increasing=False):
     expanded_chain = [None]*L
     seqpos0 = -1
     for elem in res_num:
-        chain, rang = elem.split(":")
+        sp = elem.split(":") # we're dropping segment_id if it exists
+        chain = sp[0]
+        rang = sp[-1]
         if '-' in rang:
             lb, ub = [int(x) for x in rang.split("-")]
         else:
