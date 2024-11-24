@@ -479,7 +479,10 @@ def get_chain_ids(structure, tag="FIXME", resnum_line=None):
         idd, rangee = part.split(":")
         assert(len(idd) == 1)
 
-        start, end = [int(x) for x in rangee.split('-')]
+        if '-' in rangee:
+            start, end = [int(x) for x in rangee.split('-')]
+        else:
+            start, end = rangee
 
         chain_ids += idd*(end-start + 1)
 
