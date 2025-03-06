@@ -470,14 +470,15 @@ def get_chain_ids(structure, tag="FIXME", resnum_line=None):
         eprint("silent_tools: no RES_NUM for tag %s"%tag)
         return ""
 
-
-    parts = resnum_line.split()
+    # this can still crash if there's a : in the name and there are two copies of the tag
+    parts = resnum_line.split()[:-1]
     usable_parts = [x for x in parts if ":" in x]
 
     chain_ids = ""
     for part in usable_parts:
         idd, rangee = part.split(":")
-        assert(len(idd) == 1)
+
+        assert(len(idd) == 1), resnum_line
 
         if '-' in rangee:
             start, end = [int(x) for x in rangee.split('-')]
