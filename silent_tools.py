@@ -393,7 +393,8 @@ def validate_silent_index(file, silent_index):
 
 def file_size(file):
     file = get_real_file(file)
-    return int(cmd("du -b %s | awk '{print $1}'"%file).strip())
+    # return int(cmd("du -b %s | awk '{print $1}'"%file).strip()) # doesn't work on mac
+    return os.path.getsize(file)
 
 def silent_header_fix_corrupt(silent_index):
     return silent_header_fix_corrupt_slim(silent_index['sequence'], silent_index['scoreline'], silent_index['silent_type'])
