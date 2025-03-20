@@ -60,8 +60,9 @@ silent_index = silent_tools.get_silent_index( silent_file )
 
 tag_exists = defaultdict(lambda : False, {})
 bad = ""
+eprint("A")
 for tag in score_index['tags']:
-    if ( tag in silent_index['tags'] ):
+    if ( tag in silent_index['index'] ):
         tag_exists[tag] = True
     else:
         bad = tag
@@ -70,6 +71,8 @@ for tag in silent_index['tags']:
     if ( not tag_exists[tag] ):
         bad = tag
         break
+
+eprint("B")
 
 if ( bad != "" ):
     if ( len(score_index['tags']) != len(silent_index['tags'])):

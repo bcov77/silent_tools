@@ -10,6 +10,7 @@ if silent_tools_dir not in sys.path:
 import silent_tools
 from silent_tools import eprint
 import stat
+from collections import defaultdict
 
 # Don't throw an error when someone uses head
 from signal import signal, SIGPIPE, SIG_DFL
@@ -18,12 +19,17 @@ signal(SIGPIPE, SIG_DFL)
 
 all_args = sys.argv[1:]
 e_flag = False
+g_flag = False
 for i in range(len(all_args)-1, -1, -1):
     elem = all_args[i]
     if elem[0] != '-':
         continue
     if elem[1] == 'e':
         e_flag = True
+        all_args.pop(i)
+        break
+    if elem[1] == 'g':
+        g_flag = True
         all_args.pop(i)
         break
     assert False, 'silentslice: Unknown flag ' + elem
@@ -39,6 +45,7 @@ if (len(all_args) == 0):
     eprint("        silentslice myfile.silent tag1 tag2 tag3 > new.silent")
     eprint("Flags:")
     eprint("        -e Old behavior that preserves input order of tags (new way is file-order which is faster")
+    eprint("        -g Slice by the original name instead of the in-place _1 renames")
     sys.exit(1)
 
 silent_file = all_args[0]
@@ -65,6 +72,7 @@ silent_index = silent_tools.get_silent_index( silent_file )
 sys.stdout.write( silent_tools.silent_header( silent_index ) )
 sys.stdout.flush()
 
+# Sort by file order
 if not e_flag:
     existing_tags = []
     for tag in tags:
@@ -75,6 +83,20 @@ if not e_flag:
             existing_tags.append(tag)
 
     tags = sorted(existing_tags, key=lambda x: silent_index['index'][x]['seek'])
+
+# Figure out which renamed tags we're looking for
+# The effect is that we might output duplicate tags
+if g_flag:
+    og_tag_to_new_tags = defaultdict(list)
+    for tag, og_tag in zip(silent_index['tags'], silent_index['orig_tags']):
+        og_tag_to_new_tags[og_tag].append(tag)
+    new_tags = []
+    for tag in tags:
+        if ( tag not in og_tag_to_new_tags ):
+            eprint("silentslice: Unable to find tag: %s"%tag)
+            continue
+        new_tags += og_tag_to_new_tags[tag]
+    tags = new_tags
 
 with open(silent_file, errors='ignore') as sf:
     for tag in tags:
