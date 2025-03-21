@@ -43,15 +43,23 @@ if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
     tag_buffers += sys.stdin.readlines()
 tag_buffers += sys.argv[2:]
 
+any_spaces = False
 tags = []
 for line in tag_buffers:
     line = line.strip()
     if (len(line) == 0):
         continue
     tags.append(line)
+    if ' ' in line:
+        any_spaces = True
+
+if any_spaces:
+    eprint("Warning!!! There are spaces in the names of your designs!"
+        " Unless you really know what you're doing this is going to break the silent file")
 
 
 silent_index = silent_tools.get_silent_index( silent_file )
+
 
 if (len(silent_index['tags']) != len(tags)):
     eprint("Error! Number of input tags (%i) is not equal to number of tags in silent file (%i)!"%

@@ -17,11 +17,14 @@ import numpy as np
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE, SIG_DFL) 
 
-if (len(sys.argv) != 3):
+if (len(sys.argv) not in [3, 4]):
     eprint("")
     eprint("silentsplitaf3buckets by bcov - a tool to split a silentfile into parts with the same sequence length by af3 buckets")
     eprint("Usage:")
-    eprint("        silentsplitaf3buckets myfile.silent TAGS_PER_SILENT_FILE")
+    eprint("        silentsplitaf3buckets myfile.silent TAGS_PER_SILENT_FILE [AF3_bucket_step=16]")
+    eprint("")
+    eprint("        The AF3_bucket_step in unmodified AF3 is 256")
+    eprint("        In the ppi one it has been lowered to 16")
     sys.exit(1)
 
 silent_file = sys.argv[1]
@@ -38,10 +41,15 @@ except:
     eprint("silentsplitbylength: Second argument must be a number greater than 0")
     assert(False)
 
+bucket_step = 16
+if len(sys.argv) == 4:
+    bucket_step = int(sys.argv[3])
+
 alpha = "abcdefghijklmnopqrstuvwxyz"
 silent_index = silent_tools.get_silent_index( silent_file )
 
-bucket_sizes = np.array([256,512,768,1024,1280,1536,2048,2560,3072,3584,4096,4608,5120,5376], dtype=int)
+max_bucket_size = 5120
+bucket_sizes = np.arange(bucket_step, max_bucket_size, bucket_step, dtype=int)
 
 def get_split_str(width, number):
     out_str = ""
