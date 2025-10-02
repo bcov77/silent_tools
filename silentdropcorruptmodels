@@ -76,6 +76,7 @@ with open(silent_file, errors='ignore') as sf:
                     continue
                 if ( line[5] in "HEL" ):
                     num_res_lines += 1
+                    entered_structure += True
                     continue
                 if entered_structure:
                     corrupt_lines.append(line)
