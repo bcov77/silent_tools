@@ -16,7 +16,20 @@ import stat
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE, SIG_DFL) 
 
-if (len(sys.argv) == 1):
+all_args = sys.argv[1:]
+b_flag = False
+for i in range(len(all_args)-1, -1, -1):
+    elem = all_args[i]
+    if elem[0] != '-':
+        continue
+    if elem[1] == 'b':
+        b_flag = True
+        all_args.pop(i)
+        break
+    assert False, 'silentrename: Unknown flag ' + elem
+
+
+if (len(all_args) == 0):
     eprint("")
     eprint('silentrename by bcov - a tool to rename the tags of a silent file')
     eprint("Usage:")
@@ -27,6 +40,9 @@ if (len(sys.argv) == 1):
     eprint("Important! You must pass the same number of tags that there are in the")
     eprint("    silent file.")
     eprint("")
+    eprint("Flags:")
+    eprint("        -b Broadcast mode: A silent file with 1 structure can be duplicated with arbitrarily many names")
+    eprint("")
     eprint("Example usage:")
     eprint("")
     eprint("silentls my.silent > tags.list")
@@ -36,12 +52,12 @@ if (len(sys.argv) == 1):
     eprint("silentls my.silent | sed 's/_0001$//g' | silentrename my.silent > new.silent")
     sys.exit(1)
 
-silent_file = sys.argv[1]
+silent_file = all_args[0]
 
 tag_buffers = []
 if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
     tag_buffers += sys.stdin.readlines()
-tag_buffers += sys.argv[2:]
+tag_buffers += all_args[1:]
 
 any_spaces = False
 tags = []
@@ -60,11 +76,14 @@ if any_spaces:
 
 silent_index = silent_tools.get_silent_index( silent_file )
 
-
-if (len(silent_index['tags']) != len(tags)):
-    eprint("Error! Number of input tags (%i) is not equal to number of tags in silent file (%i)!"%
-        (len(tags), len(silent_index['tags'] )))
-    sys.exit(1)
+if b_flag:
+    if len(silent_index['tags']) != 1:
+        eprint("Error! -b implies that the silent file should have exactly 1 structure")
+else:
+    if (len(silent_index['tags']) != len(tags)):
+        eprint("Error! Number of input tags (%i) is not equal to number of tags in silent file (%i)!"%
+            (len(tags), len(silent_index['tags'] )))
+        sys.exit(1)
 
 
 sys.stdout.write( silent_tools.silent_header( silent_index ) )
@@ -82,8 +101,8 @@ sys.stdout.flush()
 #         sys.stdout.flush()
 
 
-total_structures = len(silent_index['tags'])
-seek_size = 1000
+total_structures = len(tags)
+seek_size = 1 if b_flag else 1000
 cur_struct = 0
 cur_write = 0
 
@@ -93,11 +112,12 @@ with open(silent_file, errors='ignore') as sf:
         if ( cur_struct + seek_size > total_structures ):
             seek_size = total_structures - cur_struct
 
-        structures = silent_tools.get_silent_structures_true_slice( sf, 
-                            silent_index, cur_struct, cur_struct+seek_size, True )
+        if not b_flag or cur_struct == 0:
+            structures = silent_tools.get_silent_structures_true_slice( sf,
+                                silent_index, cur_struct, cur_struct+seek_size, True )
 
         for structure in structures:
-            original_tag = silent_index['orig_tags'][cur_write]
+            original_tag = silent_index['orig_tags'][0 if b_flag else cur_write]
             sys.stdout.write(structure.replace(original_tag, tags[cur_write]))
             sys.stdout.flush()
             cur_write += 1
