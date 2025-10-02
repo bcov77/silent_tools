@@ -56,6 +56,8 @@ with open(silent_file, errors='ignore') as sf:
         assert( is_binary ^ is_protein )
 
         num_res_lines = 0
+        corrupt_lines = []
+        entered_structure = False
         for line in structure:
             if ( is_binary ):
                 if ( len(line) == 0 ):
@@ -63,16 +65,31 @@ with open(silent_file, errors='ignore') as sf:
                 sp = line.split()
                 if ( line[0] in "HEL" and len(sp) == 2 and (len(sp[0]) - 1) % 16 == 0):
                     num_res_lines += 1
+                    entered_structure = True
+                    continue
+                if entered_structure:
+                    corrupt_lines.append(line)
+                    continue
+                continue
             if ( is_protein ):
                 if ( len(line) < 6 ):
                     continue
                 if ( line[5] in "HEL" ):
                     num_res_lines += 1
+                    continue
+                if entered_structure:
+                    corrupt_lines.append(line)
+                    continue
+                continue
 
 
         if ( seqlen != num_res_lines ):
             eprint("silentdropcorruptmodels: Found %5i res expected %5i res: %s"%
                 (num_res_lines, seqlen, tag))
+        elif len(corrupt_lines) > 0:
+            eprint('silentdropcorruptmodels: %i corrupt lines found in: %s'%(len(corrupt_lines), tag))
+            for line in corrupt_lines:
+                eprint('silentdropcorruptmodels:', line)
         else:
             sys.stdout.write("".join(structure))
             sys.stdout.flush()
