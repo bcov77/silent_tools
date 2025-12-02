@@ -68,7 +68,7 @@ def get_split_str2(number):
 def get_sequence_length( structure ):
     for line in structure.split('\n'):
         if not line.startswith( "ANNOTATED_SEQUENCE" ): continue
-        the_len = len( re.sub( "\[.*?\]", "", line.split(' ')[1] ) )
+        the_len = len( re.sub( "\\[.*?\\]", "", line.split(' ')[1] ) )
         bucket_len = bucket_sizes[np.searchsorted(bucket_sizes, the_len, side='left')]
         return bucket_len
 
