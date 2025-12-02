@@ -20,6 +20,7 @@ signal(SIGPIPE, SIG_DFL)
 all_args = sys.argv[1:]
 e_flag = False
 g_flag = False
+m_flag = False
 for i in range(len(all_args)-1, -1, -1):
     elem = all_args[i]
     if elem[0] != '-':
@@ -27,11 +28,15 @@ for i in range(len(all_args)-1, -1, -1):
     if elem[1] == 'e':
         e_flag = True
         all_args.pop(i)
-        break
+        continue
     if elem[1] == 'g':
         g_flag = True
         all_args.pop(i)
-        break
+        continue
+    if elem[1] == 'm':
+        m_flag = True
+        all_args.pop(i)
+        continue
     assert False, 'silentslice: Unknown flag ' + elem
 
 
@@ -46,14 +51,20 @@ if (len(all_args) == 0):
     eprint("Flags:")
     eprint("        -e Old behavior that preserves input order of tags (new way is file-order which is faster")
     eprint("        -g Slice by the original name instead of the in-place _1 renames")
+    eprint("        -m multi-silent: You can give multiple silent files instead of one. In this mode you must pipe your tags in via |")
     sys.exit(1)
 
-silent_file = all_args[0]
+silent_files = all_args[0]
 
 tag_buffers = []
 if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
     tag_buffers += sys.stdin.readlines()
-tag_buffers += all_args[1:]
+
+if m_flag:
+    silent_files = all_args[0:]
+else:
+    silent_files = [all_args[0]]
+    tag_buffers += all_args[1:]
 
 tags = []
 for line in tag_buffers:
@@ -67,46 +78,51 @@ for line in tag_buffers:
 if (len(tags) != len(set(tags))):
     eprint("silentslice: Warning: duplicate tags specified")
 
-silent_index = silent_tools.get_silent_index( silent_file )
+silent_index_and_files = [(silent_tools.get_silent_index( silent_file ), open(silent_file)) for silent_file in silent_files]
 
-sys.stdout.write( silent_tools.silent_header( silent_index ) )
+sys.stdout.write( silent_tools.silent_header( silent_index_and_files[0][0] ) )
 sys.stdout.flush()
 
-# Sort by file order
-if not e_flag:
-    existing_tags = []
-    for tag in tags:
-        if ( tag not in silent_index['index'] ):
-            eprint("silentslice: Unable to find tag: %s"%tag)
-            continue
-        else:
-            existing_tags.append(tag)
+# Figure out which tags exist in which silent files
+existing_tag_seek_index_sf = []
+for tag in tags:
+    found = False
+    for silent_index, sf in silent_index_and_files:
+        if tag in silent_index['index']:
+            existing_tag_seek_index_sf.append((tag, silent_index['index'][tag]['seek'], silent_index, sf))
+            if found:
+                eprint("silentslice: Tag found multiple times: %s"%tag)
+            found = True
+    if not found:
+        eprint("silentslice: Unable to find tag: %s"%tag)
+        continue
 
-    tags = sorted(existing_tags, key=lambda x: silent_index['index'][x]['seek'])
+if not e_flag:
+    existing_tag_seek_index_sf = sorted(existing_tag_seek_index_sf, key=lambda x: x[1])
 
 # Figure out which renamed tags we're looking for
 # The effect is that we might output duplicate tags
 if g_flag:
     og_tag_to_new_tags = defaultdict(list)
-    for tag, og_tag in zip(silent_index['tags'], silent_index['orig_tags']):
-        og_tag_to_new_tags[og_tag].append(tag)
+    for silent_index, sf in silent_index_and_files:
+        for tag, og_tag in zip(silent_index['tags'], silent_index['orig_tags']):
+            og_tag_to_new_tags[og_tag].append((tag, 0, silent_index, sf))
     new_tags = []
-    for tag in tags:
+    for tag, _, _, _ in existing_tag_seek_index_sf:
         if ( tag not in og_tag_to_new_tags ):
-            eprint("silentslice: Unable to find tag: %s"%tag)
+            eprint("silentslice: Unable to find tag: %s"%tag) # I don't think this can throw after the m_flag changes
             continue
         new_tags += og_tag_to_new_tags[tag]
-    tags = new_tags
+    existing_tag_seek_index_sf = new_tags
 
-with open(silent_file, errors='ignore') as sf:
-    for tag in tags:
+for tag, _, silent_index, sf in existing_tag_seek_index_sf:
 
-        if ( tag not in silent_index['index'] ):
-            eprint("silentslice: Unable to find tag: %s"%tag)
-            continue
-        structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
+    if ( tag not in silent_index['index'] ):
+        eprint("silentslice: Unable to find tag: %s"%tag) # I don't think this can throw after the m_flag changes
+        continue
+    structure = silent_tools.get_silent_structure_file_open( sf, silent_index, tag )
 
-        sys.stdout.write("".join(structure))
-        sys.stdout.flush()
+    sys.stdout.write("".join(structure))
+    sys.stdout.flush()
 
 
