@@ -137,7 +137,7 @@ for pdb in pdbs:
         eprint("silentsketchfrompdbs: Error! pdb couldn't be opened", pdb)
         continue
 
-    sys.stdout.write(''.join(silent_tools.pdb_to_structure(pdb_lines, tag, write_header=first )))
+    sys.stdout.write(''.join(silent_tools.pdb_to_structure(pdb_lines, tag, write_header=first, allow_extra_atoms=True )))
     sys.stdout.flush()
     first = False
 

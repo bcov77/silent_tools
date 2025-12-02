@@ -400,6 +400,7 @@ rosetta_aa_order = {
 synonyms = {
     " NV ":" N  ", # PRO
     "CAV ":" CA ", # PRO
+
 }
 
 # Rosetta, why did you do this???
@@ -981,6 +982,8 @@ def parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_
         if in_a_disulfide:
             assert name3 == 'CYS'
             variants.append('disulfide')
+        elif name3 == 'CYS' and ' HG ' not in d:
+            variants.append('disulfide')
 
         # there's no way to detect LowerDNA, but it isn't necessary
         if "HO3'" in d:
@@ -997,6 +1000,7 @@ def parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_
         messages = []
         no_atom_errors = True
         res_coords = []
+        renamed_h_used = set()
         for atom_name in atom_order:
             og_atom_name = atom_name
 
@@ -1004,6 +1008,23 @@ def parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_
             if not_found and atom_name in synonyms:
                 atom_name = synonyms[atom_name]
                 not_found = atom_name not in d
+
+            # We're missing a hydrogen, check for biotite naming scheme
+            if not_found and atom_name[0].isnumeric() and atom_name[1] == 'H':
+                biotite_format = atom_name[1:].strip() + '%i'
+                if len(biotite_format) < 5:
+                    biotite_format = ' ' + biotite_format
+                biotite_format += ' '*(5 - len(biotite_format))
+                for i_h in range(1, 4):
+                    try_name = biotite_format%i_h
+                    if try_name in renamed_h_used:
+                        continue
+                    if try_name in d:
+                        atom_name = try_name
+                        renamed_h_used.add(try_name)
+                        not_found = False
+                        break
+
 
             if not_found:
                 messages.append(f'Residue {ires+1} {name3} missing atom "{og_atom_name}"')
@@ -1044,7 +1065,7 @@ def parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_
 
 # score_dict is string -> float or string
 # pdb_info_labels is int -> list(string)
-def pdb_to_structure(pdb_lines, tag, write_header=True, score_dict={}, pdb_info_labels={}):
+def pdb_to_structure(pdb_lines, tag, write_header=True, score_dict={}, pdb_info_labels={}, allow_extra_atoms=False):
 
     chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, more_info_labels = parse_pdb_into_needed_format(pdb_lines)
 
@@ -1057,7 +1078,7 @@ def pdb_to_structure(pdb_lines, tag, write_header=True, score_dict={}, pdb_info_
 
 
     silent = parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, tag,
-                                                write_header=write_header, score_dict=score_dict, pdb_info_labels=more_info_labels)
+                                                write_header=write_header, score_dict=score_dict, pdb_info_labels=more_info_labels, allow_extra_atoms=allow_extra_atoms)
 
     return silent
 
