@@ -2,7 +2,7 @@
 A bunch of shell utilities for dealing the silent files
 
 ```bash
-# make a silent file (-j 10 to use to processors)
+# make a silent file (-j 10 to use 10 processors)
 silentfrompdbs *.pdb > my.silent
 
 # ask what's in a silent file
