@@ -2,7 +2,7 @@
 A bunch of shell utilities for dealing the silent files
 
 ```bash
-# make a silent file
+# make a silent file (-j 10 to use to processors)
 silentfrompdbs *.pdb > my.silent
 
 # ask what's in a silent file
@@ -11,7 +11,7 @@ silentls my.silent
 # ask how many things are in a silent file
 silentls my.silent | wc -l   
 
-# extract all pdbs from a silent file
+# extract all pdbs from a silent file (-j 10 to use 10 processors)
 silentextract my.silent   
 
 # extract the first 10 pdbs from a silent file
