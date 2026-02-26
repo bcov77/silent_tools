@@ -477,7 +477,12 @@ def get_chain_ids(structure, tag="FIXME", resnum_line=None):
 
     chain_ids = ""
     for part in usable_parts:
-        idd, rangee = part.split(":")
+        sp = part.split(':')
+        if len(sp) == 2:
+            idd, rangee = sp
+        else:
+            assert len(sp) == 3
+            idd, _, rangee = sp # it's like the segment id
 
         assert(len(idd) == 1), resnum_line
 
