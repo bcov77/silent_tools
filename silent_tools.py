@@ -564,9 +564,9 @@ def sketch_get_atoms(structure, atom_nums, chains=None):
     return final
 
 
-def extract_score_files_from_structure(lines):
+def extract_score_files_from_silent_lines(lines):
     '''
-    Extract the scorefile(s) inside of a silent file
+    Extract the scorefile(s) inside of a silent file. Critically the header needs to be there
 
     It's important to realize that due to the nature of silent files, this process might be ugly if 
     the silent files weren't created well. The header that defines the columns in the silent file
