@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import struct
+import base64
 
 from collections import defaultdict
 
@@ -469,6 +470,173 @@ for key, val in name3_to_name1.items():
 
 name3_to_name1['HIS_D'] = 'H'
 
+atom_type_to_element = {
+    'CNH2':'C',
+    'COO':'C',
+    'CH0':'C',
+    'CH1':'C',
+    'CH2':'C',
+    'CH3':'C',
+    'aroC':'C',
+    'Ntrp':'N',
+    'Nhis':'N',
+    'NtrR':'N',
+    'NH2O':'N',
+    'Nlys':'N',
+    'Narg':'N',
+    'Npro':'N',
+    'OH':'O',
+    'OW':'O',
+    'ONH2':'O',
+    'OOC':'O',
+    'Oaro':'O',
+    'Oet2':'O',
+    'Oet3':'O',
+    'S':'S',
+    'SH1':'S',
+    'Nbb':'N',
+    'CAbb':'C',
+    'CObb':'C',
+    'OCbb':'O',
+    'Phos':'P',
+    'Pbb':'P',
+    'Hpol':'H',
+    'HS':'H',
+    'Hapo':'H',
+    'Haro':'H',
+    'HNbb':'H',
+    'Hwat':'H',
+    'Owat':'O',
+    'Opoint':'O',
+    'HOH':'O',
+    'Bsp2':'B',
+    'F':'F',
+    'Cl':'CL',
+    'Br':'BR',
+    'I':'I',
+    'Zn2p':'ZN',
+    'Co2p':'CO',
+    'Cu2p':'CU',
+    'Fe2p':'FE',
+    'Fe3p':'FE',
+    'Mg2p':'MG',
+    'Ca2p':'CA',
+    'Pha':'P',
+    'OPha':'O',
+    'OHha':'O',
+    'Hha':'H',
+    'CO3':'C',
+    'OC3':'O',
+    'Si':'Si',
+    'OSi':'O',
+    'Oice':'O',
+    'Hice':'H',
+    'Na1p':'NA',
+    'K1p':'K',
+    'He':'HE',
+    'Li':'LI',
+    'Be':'BE',
+    'Ne':'NE',
+    'Al':'AL',
+    'Ar':'AR',
+    'Sc':'SC',
+    'Ti':'TI',
+    'V':'V',
+    'Cr':'CR',
+    'Mn':'MN',
+    'Ni':'NI',
+    'Ga':'GA',
+    'Ge':'GE',
+    'As':'AS',
+    'Se':'SE',
+    'Kr':'KR',
+    'Rb':'RB',
+    'Sr':'SR',
+    'Y':'Y',
+    'Zr':'ZR',
+    'Nb':'NB',
+    'Mo':'MO',
+    'Tc':'TC',
+    'Ru':'RU',
+    'Rh':'RH',
+    'Pd':'PD',
+    'Ag':'AG',
+    'Cd':'CD',
+    'In':'IN',
+    'Sn':'SN',
+    'Sb':'SB',
+    'Te':'TE',
+    'Xe':'XE',
+    'Cs':'CS',
+    'Ba':'BA',
+    'La':'LA',
+    'Ce':'CE',
+    'Pr':'PR',
+    'Nd':'ND',
+    'Pm':'PM',
+    'Sm':'SM',
+    'Eu':'EU',
+    'Gd':'GD',
+    'Tb':'TB',
+    'Dy':'DY',
+    'Ho':'HO',
+    'Er':'ER',
+    'Tm':'TM',
+    'Yb':'YB',
+    'Lu':'LU',
+    'Hf':'HF',
+    'Ta':'TA',
+    'W':'W',
+    'Re':'RE',
+    'Os':'OS',
+    'Ir':'IR',
+    'Pt':'PT',
+    'Au':'AU',
+    'Hg':'HG',
+    'Tl':'TL',
+    'Pb':'PB',
+    'Bi':'BI',
+    'Po':'PO',
+    'At':'AT',
+    'Rn':'RN',
+    'Fr':'FR',
+    'Ra':'RA',
+    'Ac':'AC',
+    'Th':'TH',
+    'Pa':'PA',
+    'U':'U',
+    'Np':'NP',
+    'Pu':'PU',
+    'Am':'AM',
+    'Cm':'CM',
+    'Bk':'BK',
+    'Cf':'CF',
+    'Es':'ES',
+    'Fm':'FM',
+    'Md':'MD',
+    'No':'NO',
+    'Lr':'LR',
+    'SUCK':'Z',
+    'REPL':'Z',
+    'REPLS':'Z',
+    'HREPS':'Z',
+    'VIRT':'X',
+    'MPct':'X',
+    'MPnm':'X',
+    'MPdp':'X',
+    'MPtk':'X',
+}
+
+def fix_element_name(element):
+    if len(element) == 1:
+        return element
+    return element[0] + element[1].lower()
+element_to_atom_type = {}
+for key, value in atom_type_to_element.items():
+    value = fix_element_name(value)
+    atom_type_to_element[key] = value
+    element_to_atom_type[value] = key
+
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -576,13 +744,77 @@ def get_atom_order_from_variants(name3, variants, params_dict={}):
 
     return atom_order
 
+# Rosetta is my favorite program
+# It reorders params file on the fly
+def reorder_params_rosetta_order(atom_order, elements, bonds, name_to_4char, first_sidechain_atom):
+    # Rosetta's internal atom ordering:
+    #   1. Backbone heavy atoms (params-file order, i.e. before FIRST_SIDECHAIN_ATOM)
+    #   2. Sidechain heavy atoms (params-file order, i.e. at/after FIRST_SIDECHAIN_ATOM)
+    #   3. Hydrogens grouped by parent heavy atom (following the heavy atom order above),
+    #      with each group ordered by BOND-declaration order in the params file.
+
+    elem_map = dict(zip(atom_order, elements))
+    is_H = {name: (elem == 'H') for name, elem in zip(atom_order, elements)}
+
+    if first_sidechain_atom is None:
+        fsa_idx = 0          # no FIRST_SIDECHAIN_ATOM: all heavy atoms are sidechain
+    elif first_sidechain_atom == 'NONE':
+        fsa_idx = len(atom_order)   # all heavy atoms are backbone
+    else:
+        fsa_4char = name_to_4char.get(first_sidechain_atom)
+        fsa_idx = atom_order.index(fsa_4char) if fsa_4char in atom_order else 0
+
+    backbone_heavy = []
+    sidechain_heavy = []
+    for i, name in enumerate(atom_order):
+        if not is_H[name]:
+            if i < fsa_idx:
+                backbone_heavy.append(name)
+            else:
+                sidechain_heavy.append(name)
+
+    heavy_order = backbone_heavy + sidechain_heavy
+    heavy_set = set(heavy_order)
+
+    h_by_parent = {a: [] for a in heavy_order}
+    h_seen = set()
+    for a1_str, a2_str in bonds:
+        a1 = name_to_4char.get(a1_str)
+        a2 = name_to_4char.get(a2_str)
+        if a1 is None or a2 is None:
+            continue
+        for heavy, h in [(a1, a2), (a2, a1)]:
+            if heavy in heavy_set and is_H.get(h, False) and h not in h_seen:
+                h_by_parent[heavy].append(h)
+                h_seen.add(h)
+
+    new_order = []
+    new_elements = []
+    for a in heavy_order:
+        new_order.append(a)
+        new_elements.append(elem_map[a])
+    for a in heavy_order:
+        for h in h_by_parent[a]:
+            new_order.append(h)
+            new_elements.append(elem_map[h])
+    # Safety net: include any H atoms with no BOND entry
+    for name in atom_order:
+        if is_H[name] and name not in h_seen:
+            new_order.append(name)
+            new_elements.append(elem_map[name])
+
+    return new_order, new_elements
+
+
 def parse_raw_params(params_files):
     params_dict = {}
     for params_file in params_files:
         atom_order = []
+        elements = []
         bonds = []
         name3 = None
         name_to_4char = {}
+        first_sidechain_atom = None
         for line in params_file.split('\n'):
             line = line.strip()
             if len(line) == 0:
@@ -592,12 +824,18 @@ def parse_raw_params(params_files):
             elif line.startswith('ATOM') and len(line) >= 9:
                 atom_name_4 = line[5:9]
                 atom_order.append(atom_name_4)
+                elements.append(atom_type_to_element[line.split()[2]])
                 name_to_4char[atom_name_4.strip()] = atom_name_4
             elif line.startswith('BOND'):
                 sp = line.split()
                 if len(sp) >= 3:
                     bonds.append((sp[1], sp[2]))
+            elif line.startswith('FIRST_SIDECHAIN_ATOM'):
+                sp = line.split()
+                if len(sp) >= 2:
+                    first_sidechain_atom = sp[1]
         if name3 is not None:
+            atom_order, elements = reorder_params_rosetta_order(atom_order, elements, bonds, name_to_4char, first_sidechain_atom)
             atom_index = {name: i for i, name in enumerate(atom_order)}
             conect = [[] for _ in atom_order]
             for a1_str, a2_str in bonds:
@@ -611,6 +849,8 @@ def parse_raw_params(params_files):
             d = {}
             d['atom_order'] = atom_order
             d['conect'] = conect
+            d['elements'] = elements
+
             params_dict[name3] = d
     return params_dict
 
@@ -662,11 +902,13 @@ def structure_to_pdb(structure, renumber_resno_increasing=False, raw_params_file
             atom_lines.append(sp[0])
             continue
         if line.startswith("REMARK"):
-            if line.startswith("REMARK PARAMS"):
-                raw_params_files.append(line.replace('REMARK PARAMS ', '').replace('|', '\n'))
             continue
         eprint("Warning! Unknown silentfile line:", line)
 
+    for infos in pdb_infos.values():
+        for info in infos:
+            if info.startswith("PARAMS:"):
+                raw_params_files.append(base_64_decode_params(info.split(':')[-1]))
 
     params_dict = parse_raw_params(raw_params_files)
 
@@ -770,9 +1012,12 @@ def structure_to_pdb(structure, renumber_resno_increasing=False, raw_params_file
             atomno += 1
             atom_name_to_atomno[atom_name] = atomno
 
-            element = atom_name[1]
-            if atom_name[0] not in ' 0123456789':
-                element = atom_name[0]
+            if name3 in params_dict and params_dict[name3]['elements'][iatom]:
+                element = params_dict[name3]['elements'][iatom]
+            else:
+                element = atom_name[1]
+                if atom_name[0] not in ' 0123456789':
+                    element = atom_name[0]
 
             pdb_lines.append(format_atom(
                 ATOM=ATOM,
@@ -888,7 +1133,7 @@ def get_jump_stub(atom_dict, is_pro=False, atom_order=None):
                                      np.array(atom_dict[" P  "]))
 
 
-def build_conect_dict(raw_conect, atomno_to_info, hetatm_idents):
+def build_conect_dict(raw_conect, atomno_to_info, hetatm_idents, atomno_to_xyz=None):
     # Build ident -> [atom_name_4, ...] in serial order
     ident_to_atom_order = {}
     for serial in sorted(atomno_to_info.keys()):
@@ -925,12 +1170,66 @@ def build_conect_dict(raw_conect, atomno_to_info, hetatm_idents):
                     bonds[ident][dst] = set()
                 bonds[ident][dst].add(src)
 
-    # Add rows for atoms within CONECT idents that had no CONECT record of their own
-    for ident in bonds:
-        if ident in ident_to_atom_order:
-            for atom_name in ident_to_atom_order[ident]:
+    # Invent bonds for hetatm atoms that have no connections using distance cutoffs
+    if atomno_to_xyz is not None:
+        # Build ident -> list of (serial, atom_name, xyz) for hetatm idents
+        ident_to_serials = {}
+        for serial in sorted(atomno_to_info.keys()):
+            atom_name, ident = atomno_to_info[serial]
+            if ident not in hetatm_idents:
+                continue
+            if serial not in atomno_to_xyz:
+                continue
+            if ident not in ident_to_serials:
+                ident_to_serials[ident] = []
+            ident_to_serials[ident].append((serial, atom_name, atomno_to_xyz[serial]))
+
+        for ident, atoms in ident_to_serials.items():
+            if len(atoms) < 2:
+                continue
+
+            # Find atoms with no bonds
+            unconnected = []
+            for serial, atom_name, xyz in atoms:
+                has_bond = (ident in bonds and
+                            atom_name in bonds[ident] and
+                            len(bonds[ident][atom_name]) > 0)
+                if not has_bond:
+                    unconnected.append((serial, atom_name, xyz))
+
+            if not unconnected:
+                continue
+
+            if ident not in bonds:
+                bonds[ident] = {}
+
+            for serial, atom_name, xyz in unconnected:
+                # Determine hydrogen vs heavy atom by first non-space char of atom_name_4
+                first_non_space = atom_name.lstrip(' ')
+                is_hydrogen = len(first_non_space) > 0 and first_non_space[0] == 'H'
+                cutoff = 1.3 if is_hydrogen else 2.0
+
+                xyz_arr = np.array(xyz)
+
+                # Compute distances to all other atoms in same ident
+                candidates = [(other_name, np.linalg.norm(xyz_arr - np.array(other_xyz)))
+                              for other_serial, other_name, other_xyz in atoms
+                              if other_serial != serial]
+
+                bonded = [name for name, dist in candidates if dist <= cutoff]
+
+                if not bonded:
+                    # No atoms within cutoff: pick the closest
+                    bonded = [min(candidates, key=lambda x: x[1])[0]]
+
                 if atom_name not in bonds[ident]:
                     bonds[ident][atom_name] = set()
+                for b in bonded:
+                    bonds[ident][atom_name].add(b)
+                    # Keep bidirectional
+                    if b not in bonds[ident]:
+                        bonds[ident][b] = set()
+                    bonds[ident][b].add(atom_name)
 
     # Build final conect_dict in serial order for all HETATM idents
     conect_dict = {}
@@ -942,7 +1241,7 @@ def build_conect_dict(raw_conect, atomno_to_info, hetatm_idents):
             if atom_name in bonds[ident]:
                 conect_dict[ident].append([atom_name] + list(bonds[ident][atom_name]))
 
-    # Add HETATM idents that had no CONECT records at all: record just the first atom unbonded
+    # Catch single-atom ligands like ZN and make sure they end up in conect_dict
     for ident in hetatm_idents:
         if ident not in conect_dict and ident in ident_to_atom_order:
             first_atom = ident_to_atom_order[ident][0]
@@ -967,8 +1266,11 @@ def parse_pdb_into_needed_format(pdb_lines):
     in_a_disulfide_set = set() # temporary which res_nos are in disulfides
 
     atomno_to_info = {}  # serial int -> (atom_name_4, ident)
+    atomno_to_xyz = {}   # serial int -> [x, y, z]
     raw_conect = []      # list of lists of int serials
     hetatm_idents = set()
+    hetatm_elements = {}  # ident -> {atom_name_4 -> element}
+    hetatm_coords = {}   # ident -> {atom_name_4 -> [x, y, z]}
 
     last_ident = ''
 
@@ -1015,14 +1317,25 @@ def parse_pdb_into_needed_format(pdb_lines):
         serial = int(line[6:11].strip())
         atom = line[12:16]
 
+        # Stupid biotite
+        if atom[0] == ' ' and atom[1].isnumeric():
+            atom = atom[1:] + ' '
+
         if line.startswith('HETATM'):
             hetatm_idents.add(ident)
+            element = line[76:78].strip() if len(line) >= 78 else ''
+            hetatm_elements.setdefault(ident, {})[atom] = element
 
         atomno_to_info[serial] = (atom, ident)
 
         x = float(line[30:30+8])
         y = float(line[38:38+8])
         z = float(line[46:46+8])
+        atomno_to_xyz[serial] = [x, y, z]
+
+        if line.startswith('HETATM'):
+            hetatm_coords.setdefault(ident, {})[atom] = [x, y, z]
+
         name3 = line[17:20]
         chain = line[21]
         res_num = int(line[22:26].strip())
@@ -1052,9 +1365,9 @@ def parse_pdb_into_needed_format(pdb_lines):
     for a, b in disulfides:
         assert not a is None and not b is None
 
-    conect_dict = build_conect_dict(raw_conect, atomno_to_info, hetatm_idents)
+    conect_dict = build_conect_dict(raw_conect, atomno_to_info, hetatm_idents, atomno_to_xyz)
 
-    return chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, pdb_info_labels, conect_dict
+    return chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, pdb_info_labels, conect_dict, hetatm_elements, hetatm_coords
 
 
 def fmt(value):
@@ -1064,9 +1377,55 @@ def fmt(value):
         return '%.3f'%value
 
 
+def _icoor_values(child_xyz, parent_xyz, angle_xyz, torsion_xyz):
+    """Compute Rosetta ICOOR_INTERNAL (phi_deg, theta_deg, d) from Cartesian coords.
+
+    Mirrors Stub::from_four_points(center=parent, a=parent, b=angle, c=torsion):
+      e1 (x) = normalized(parent - angle)
+      e3 (z) = normalized(cross(e1, torsion - angle))
+      e2 (y) = cross(e3, e1)
+    Then inverts Stub::spherical(phi, theta, d).
+    """
+    c  = np.array(child_xyz,   dtype=float)
+    p  = np.array(parent_xyz,  dtype=float)
+    a  = np.array(angle_xyz,   dtype=float)
+    t  = np.array(torsion_xyz, dtype=float)
+
+    diff = c - p
+    d = float(np.linalg.norm(diff))
+    if d < 1e-9:
+        return 0.0, 0.0, 0.0
+
+    e1 = p - a
+    e1_norm = np.linalg.norm(e1)
+    if e1_norm < 1e-9:
+        return 0.0, 0.0, d
+    e1 = e1 / e1_norm
+
+    cb = t - a  # c - b in from_four_points notation
+    e3 = np.cross(e1, cb)
+    e3_norm = np.linalg.norm(e3)
+    if e3_norm < 1e-9:  # collinear — nudge as Rosetta does
+        cb = cb + np.array([1.4e-7, 6.7e-8, 2.3e-7])
+        e3 = np.cross(e1, cb)
+        e3_norm = np.linalg.norm(e3)
+    e3 = e3 / e3_norm
+
+    e2 = np.cross(e3, e1)
+
+    x_comp = float(np.dot(diff, e1))
+    y_comp = float(np.dot(diff, e2))
+    z_comp = float(np.dot(diff, e3))
+
+    theta = float(np.degrees(np.arccos(np.clip(x_comp / d, -1.0, 1.0))))
+    phi   = float(np.degrees(np.arctan2(z_comp, y_comp)))
+    return phi, theta, d
+
+
 def generate_raw_params(name3, d):
     atom_order = d['atom_order']
     conect = d['conect']
+    elements = d['elements']
     n = len(atom_order)
     stripped = [a.strip() for a in atom_order]
 
@@ -1076,11 +1435,12 @@ def generate_raw_params(name3, d):
     lines.append('TYPE LIGAND')
     lines.append('AA UNK')
 
-    for atom_name in atom_order:
+    for atom_name, element in zip(atom_order, elements):
         if atom_name in (' V1 ', ' V2 '):
             lines.append(f'ATOM {atom_name} VIRT VIRT 0.00')
         else:
-            lines.append(f'ATOM {atom_name} CH1  CT1  0.00')
+            atom_type = element_to_atom_type[fix_element_name(element)]
+            lines.append(f'ATOM {atom_name} {atom_type:4s}  CT1  0.00')
 
     written_bonds = set()
     for i, bonded_names in enumerate(conect):
@@ -1097,25 +1457,110 @@ def generate_raw_params(name3, d):
 
     if n == 1:
         a0 = stripped[0]
-        lines.append(f'ICOOR_INTERNAL  {a0}   0.000000   0.000000   0.000000  {a0}  {a0}  {a0}')
+        lines.append(f'ICOOR_INTERNAL  {a0}   0   0   0  {a0}  {a0}  {a0}')
     elif n == 2:
         a0, a1 = stripped[0], stripped[1]
-        lines.append(f'ICOOR_INTERNAL  {a0}   0.000000   0.000000   0.000000  {a0}  {a1}  {a1}')
-        lines.append(f'ICOOR_INTERNAL  {a1}   1.000000   1.000000   1.000000  {a0}  {a1}  {a1}')
+        lines.append(f'ICOOR_INTERNAL  {a0}   0   0   0  {a0}  {a1}  {a1}')
+        lines.append(f'ICOOR_INTERNAL  {a1}   1   1   1  {a0}  {a1}  {a1}')
     else:
-        a0, a1, a2 = stripped[0], stripped[1], stripped[2]
-        lines.append(f'ICOOR_INTERNAL  {a0}   0.000000   0.000000   0.000000  {a0}  {a1}  {a2}')
-        lines.append(f'ICOOR_INTERNAL  {a1}   1.000000   1.000000   1.000000  {a0}  {a1}  {a2}')
-        lines.append(f'ICOOR_INTERNAL  {a2}   2.000000   2.000000   2.000000  {a1}  {a0}  {a2}')
-        for i in range(3, n):
-            ai = stripped[i]
-            ap, ag, at = stripped[i-1], stripped[i-2], stripped[i-3]
-            lines.append(f'ICOOR_INTERNAL  {ai}   {i}.000000   {i}.000000   {i}.000000  {ap}  {ag}  {at}')
+        # Build bidirectional adjacency list using stripped atom names
+        stripped_set = set(stripped)
+        adj = defaultdict(list)
+        for i, bonded_list in enumerate(conect):
+            src = stripped[i]
+            for dst_4 in bonded_list:
+                dst = dst_4.strip()
+                if dst not in stripped_set:
+                    continue
+                if dst not in adj[src]:
+                    adj[src].append(dst)
+                if src not in adj[dst]:
+                    adj[dst].append(src)
+
+        # Choose initial chain a0->a1->a2 along bonded atoms.
+        # a2 is preferably bonded to a1 (extending the chain), or falls back to
+        # a second neighbor of a0 if a1 is a leaf.
+        a0 = stripped[0]
+        a1 = adj[a0][0] if adj[a0] else stripped[1]
+        a2_via_a1 = [x for x in adj[a1] if x != a0]
+        if a2_via_a1:
+            a2, a2_parent = a2_via_a1[0], a1
+        else:
+            a2_via_a0 = [x for x in adj[a0] if x != a1]
+            a2, a2_parent = (a2_via_a0[0], a0) if a2_via_a0 else (stripped[2], a1)
+
+        # Build BFS spanning tree, honoring a1 as first child of a0 and a2
+        # under a2_parent, so all parent references are bonded.
+        parent_map = {a0: None, a1: a0, a2: a2_parent}
+        seen = {a0, a1, a2}
+        bfs = [a0, a1, a2]
+        bi = 0
+        while bi < len(bfs):
+            atom = bfs[bi]; bi += 1
+            for nbr in adj[atom]:
+                if nbr not in seen:
+                    seen.add(nbr)
+                    parent_map[nbr] = atom
+                    bfs.append(nbr)
+
+        # Build stripped-key coords lookup for ICOOR computation
+        raw_coords = d.get('coords', {})
+        coords_stripped = {k.strip(): v for k, v in raw_coords.items()}
+
+        def icoor_line(child, parent, angle, torsion, i):
+            if coords_stripped and all(x in coords_stripped for x in [child, parent, angle, torsion]):
+                phi, theta, dist = _icoor_values(
+                    coords_stripped[child], coords_stripped[parent],
+                    coords_stripped[angle], coords_stripped[torsion])
+                return f'ICOOR_INTERNAL  {child}   {phi:.6f}   {theta:.6f}   {dist:.6f}  {parent}  {angle}  {torsion}'
+            return f'ICOOR_INTERNAL  {child}   {i}.000000   {i}.000000   {i}.000000  {parent}  {angle}  {torsion}'
+
+        # Write the three stub ICOOR lines (special Rosetta convention).
+        # Line 3: parent is a2_parent; angle is the other first-chain atom.
+        ang3 = a0 if a2_parent == a1 else a1
+        lines.append(icoor_line(a0, a0, a1, a2, 0))
+        lines.append(icoor_line(a1, a0, a1, a2, 1))
+        lines.append(icoor_line(a2, a2_parent, ang3, a2, 2))
+
+        written = {a0, a1, a2}
+
+        # Write remaining atoms in BFS order.  For each atom we need:
+        #   parent  – tree parent (bonded to atom by construction)
+        #   angle   – tree grandparent, or any placed bonded neighbor of parent
+        #   torsion – tree great-grandparent, or any placed bonded neighbor of angle
+        for atom in bfs:
+            if atom in written:
+                continue
+            p = parent_map[atom]
+
+            # angle: grandparent in tree, else any placed neighbor of p (not atom)
+            g = parent_map.get(p)
+            if g is None or g not in written:
+                g = next((x for x in adj[p] if x != atom and x in written), p)
+
+            # torsion: great-grandparent in tree, else any placed neighbor of g
+            # (excluding p and atom; also reject t==p which makes the dihedral degenerate)
+            t = parent_map.get(g)
+            if t is None or t not in written or t == atom or t == p:
+                t = next((x for x in adj[g] if x != p and x in written and x != atom), None)
+                if t is None:
+                    t = next((x for x in adj[g] if x in written and x != atom), p)
+
+            lines.append(icoor_line(atom, p, g, t, len(written)))
+            written.add(atom)
 
     return '\n'.join(lines) + '\n'
 
 
-def conect_dict_to_params_dict(conect_dict):
+def base_64_encode_params(params_string):
+    return base64.b64encode(params_string.encode()).decode()
+
+
+def base_64_decode_params(encoded_string):
+    return base64.b64decode(encoded_string.encode()).decode()
+
+
+def conect_dict_to_params_dict(conect_dict, hetatm_elements=None, hetatm_coords=None):
     params_dict = {}
     for ident, conect_records in conect_dict.items():
         name3 = ident[0:3]
@@ -1141,7 +1586,22 @@ def conect_dict_to_params_dict(conect_dict):
             atom_order.append(' V2 ')
             conect.append([' V1 '])
 
-        d = {'atom_order': atom_order, 'conect': conect}
+        elem_map = hetatm_elements.get(ident, {}) if hetatm_elements is not None else {}
+        element = [elem_map.get(name, '') for name in atom_order]
+
+        # Build coords dict, adding synthetic coords for virtual atoms
+        ident_coords = hetatm_coords.get(ident, {}) if hetatm_coords is not None else {}
+        coords = dict(ident_coords)
+        if coords:
+            first_xyz = coords.get(atom_order[0])
+            if first_xyz is not None:
+                if ' V1 ' in atom_order and ' V1 ' not in coords:
+                    coords[' V1 '] = [first_xyz[0] + 1.0, first_xyz[1], first_xyz[2]]
+                if ' V2 ' in atom_order and ' V2 ' not in coords:
+                    v1_xyz = coords.get(' V1 ', first_xyz)
+                    coords[' V2 '] = [v1_xyz[0], v1_xyz[1] + 1.0, v1_xyz[2]]
+
+        d = {'atom_order': atom_order, 'conect': conect, 'elements': element, 'coords': coords}
 
         if name3 in params_dict:
             existing = params_dict[name3]
@@ -1168,17 +1628,40 @@ def parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_
                                                                             write_header=False, score_dict={}, pdb_info_labels={},
                                                                             params_dict={},
                                                                             allow_missing_atoms=False,
-                                                                            allow_extra_atoms=False):
+                                                                            allow_extra_atoms=False,
+                                                                            full_params_files={}):
     assert len(aa_atom_dicts) > 0, 'Error! There are no atoms in your pdb?'
 
-    local_name3_to_name1 = {k:v for k, v in name3_to_name1.items()}
-    local_needs_annotated_name = {k for k in needs_annotated_name}
-
+    # Add virtual atoms to metal ions
     for i, name3 in enumerate(name3s):
         if name3 in params_dict:
             atom_order = params_dict[name3]['atom_order']
             if ' V1 ' in atom_order or ' V2 ' in atom_order:
                 aa_atom_dicts[i] = add_virtual_coords(aa_atom_dicts[i], atom_order)
+
+
+    local_name3_to_name1 = {k:v for k, v in name3_to_name1.items()}
+    local_needs_annotated_name = {k for k in needs_annotated_name}
+
+
+    pdb_info_labels = {k:v for k,v in pdb_info_labels.items()}
+
+    # Store params into first pdb info label and update our name3 vectors
+    for params_name3, d in params_dict.items():
+        if params_name3 in full_params_files:
+            raw_params = full_params_files[params_name3]
+        else:
+            raw_params = generate_raw_params(params_name3, d)
+        params_header = f'PARAMS:{params_name3.replace(" ", "")}:'
+        duplicate = False
+        for prev_info in pdb_info_labels.setdefault(1, []):
+            if prev_info.startswith(params_header):
+                duplicate = True
+        if not duplicate:
+            pdb_info_labels[1].append(params_header + base_64_encode_params(raw_params))
+        local_name3_to_name1[params_name3] = 'X'
+        local_needs_annotated_name.add(params_name3)
+
 
     # annotated_sequence has to come really early which is why we split this
     silent = ''
@@ -1232,13 +1715,6 @@ def parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_
         jump_rt = np.linalg.inv(stub1) @ stub2
 
         post_silent += f'RT {" ".join("%.8f"%x for x in list(jump_rt[:3,:3].flat) + list(jump_rt[:3,3].flat))} {tag}\n'
-
-    # REMARK PARAMS
-    for params_name3, d in params_dict.items():
-        raw_params = generate_raw_params(params_name3, d)
-        post_silent += 'REMARK PARAMS ' + raw_params.replace('\n', '|') + '\n'
-        local_name3_to_name1[params_name3] = 'X'
-        local_needs_annotated_name.add(params_name3)
 
     # residue lines
     missing_atom = [0, 0, 0]
@@ -1342,11 +1818,14 @@ def parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_
 
 # score_dict is string -> float or string
 # pdb_info_labels is int -> list(string)
-def pdb_to_structure(pdb_lines, tag, write_header=True, score_dict={}, pdb_info_labels={}, allow_extra_atoms=False):
+def pdb_to_structure(pdb_lines, tag, write_header=True, score_dict={}, pdb_info_labels={}, allow_extra_atoms=False, full_params_files={}):
 
-    chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, more_info_labels, conect_dict = parse_pdb_into_needed_format(pdb_lines)
+    chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, more_info_labels, conect_dict, hetatm_elements, hetatm_coords = parse_pdb_into_needed_format(pdb_lines)
 
-    params_dict = conect_dict_to_params_dict(conect_dict)
+    params_dict = conect_dict_to_params_dict(conect_dict, hetatm_elements, hetatm_coords)
+
+    for key in full_params_files:
+        params_dict[key] = parse_raw_params([full_params_files[key]])[key]
 
     # if you add into the pdb_info_labels object you modify global state
     for key in pdb_info_labels:
@@ -1358,14 +1837,71 @@ def pdb_to_structure(pdb_lines, tag, write_header=True, score_dict={}, pdb_info_
 
     silent = parsed_pdb_to_silent( chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, tag,
                                                 write_header=write_header, score_dict=score_dict, pdb_info_labels=more_info_labels,
-                                                params_dict=params_dict, allow_extra_atoms=allow_extra_atoms)
+                                                params_dict=params_dict, allow_extra_atoms=allow_extra_atoms, full_params_files=full_params_files)
 
     return silent
 
 
 
+def generate_params_for_pdb(pdb_lines):
+
+    chain_ends, aa_atom_dicts, name3s, chain_letters, res_nums, in_a_disulfides, disulfides, more_info_labels, conect_dict, hetatm_elements, hetatm_coords = parse_pdb_into_needed_format(pdb_lines)
+
+    params_dict = conect_dict_to_params_dict(conect_dict, hetatm_elements, hetatm_coords)
+
+    raw_params_dict = {}
+    for name3, d in params_dict.items():
+        raw_params_dict[name3] = generate_raw_params(name3, d)
+
+    return raw_params_dict
+
+
+def strip_to_ligands(pose):
+    from pyrosetta.rosetta.core.select.residue_selector import ResiduePropertySelector
+    from pyrosetta.rosetta.core.chemical import PROTEIN
+    # 1. Create a selector for all PROTEIN residues
+    protein_selector = ResiduePropertySelector(PROTEIN)
+    
+    # 2. Get a boolean mask (vector1_bool) of protein residues
+    protein_mask = protein_selector.apply(pose)
+    
+    # 3. Convert mask to a list of indices (in reverse to avoid index shifting)
+    # Rosetta indices are 1-based
+    protein_indices = [i for i, is_protein in enumerate(protein_mask, 1) if is_protein]
+    
+    if len(protein_indices) == pose.size():
+        return None
+
+    # 4. Delete the protein residues
+    # Deleting in reverse order is safer when using delete_residue()
+    for res_idx in sorted(protein_indices, reverse=True):
+        pose.delete_residue_slow(res_idx)
+    
+    return pose
+
+
+def inject_params_into_pyrosetta_pose(in_pose):
+    from pyrosetta.rosetta.std import stringstream
+
+    pose = strip_to_ligands(in_pose.clone())
+    if pose is None:
+        return
+
+    ss = stringstream()
+    pose.dump_pdb(ss)
+    pdb_lines = ss.str().split("\n")
+
+    raw_params_dict = generate_param_for_pdb(pdb_lines)
+
+    prev_labels = list(in_pose.pdb_info().get_reslabels(1))
+    prev_ligands = set([item.split(':')[1] for item in prev_labels if item.startswith("PARAMS:")])
+    for name3, raw_params in raw_params_dict.items():
+        if name3 in prev_ligands:
+            continue
+        params_header = f'PARAMS:{name3.replace(" ", "")}:'
+        in_pose.pdb_info().add_reslabel(1, params_header + base_64_encode_params(raw_params))
 
 
 
-
+        
 

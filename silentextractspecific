@@ -33,6 +33,7 @@ if [ $# -eq 0 ]; then
     echo >&2 "Flags:"
     echo >&2 "        -j cpus"
     echo >&2 "        -p param_file"
+    echo >&2 "        -l ligand embedded params mode"
     echo >&2 "        @flags_file"
     exit 1
 fi

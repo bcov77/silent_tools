@@ -4,6 +4,8 @@ unset SILENT_PARAMS
 unset SILENT_AT
 unset SILENT_FLAGS
 unset SILENT_FLAGS_NO_J
+unset SILENT_L
+unset SILENT_J
 
 
 POSITIONAL=()
@@ -29,6 +31,11 @@ while [[ $# -gt 0 ]]; do
       SILENT_FLAGS="$SILENT_FLAGS $1"
       shift # past value
       ;;
+    -l)
+      SILENT_L="1"
+      SILENT_FLAGS="$SILENT_FLAGS -l"
+      shift # past argument
+      ;;
     @*)
       SILENT_AT="$SILENT_AT $1"
       SILENT_FLAGS="$SILENT_FLAGS $1"
@@ -46,6 +53,8 @@ export SILENT_PARAMS
 export SILENT_AT
 export SILENT_FLAGS
 export SILENT_FLAGS_NO_J
+export SILENT_L
+export SILENT_J
 
 set -- "${POSITIONAL[@]}" # restore positional parameters
 

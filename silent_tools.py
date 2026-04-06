@@ -21,7 +21,8 @@ from _helpers_silent.rosetta_util import (format_atom, write_pdb_atoms, code_fro
             get_silent_res_data, chain_ids_to_silent_format,
             silent_line_to_atoms, get_chains_mask,
             sketch_get_cas_protein_struct, sketch_get_ncac_protein_struct,
-            pdb_to_structure, structure_to_pdb
+            pdb_to_structure, structure_to_pdb,
+            base_64_decode_params, inject_params_into_pyrosetta_pose, generate_params_for_pdb
             )
 
 

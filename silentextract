@@ -9,6 +9,7 @@ if [ $# -eq 0 ]; then
     echo >&2 "Flags:"
     echo >&2 "        -j cpus"
     echo >&2 "        -p param_file"
+    echo >&2 "        -p ligand embedded params mode"
     echo >&2 "        @flags_file"
 
     exit 1
@@ -37,7 +38,11 @@ command -v extract_pdbs >/dev/null 2>&1 || {
 
 if [ -z "${SILENT_J}" ]; then
 # Do single-thread extraction
-    "$extract_program" -in:file:silent $silent -in:file:silent_struct_type binary $SILENT_PARAMS $SILENT_AT 1>&2
+    LIGAND_EXTRA=''
+    if [[ -v "${SILENT_L}" ]]; then
+        LIGAND_EXTRA="$(${silent_dir}/silentextractparams $silent)"
+    fi
+    "$extract_program" -in:file:silent $silent -in:file:silent_struct_type binary $SILENT_PARAMS $SILENT_AT $LIGAND_EXTRA 1>&2
 else
 # Do multi-thread extraction
 
