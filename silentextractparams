@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+
+import os
+import sys
+# if you pip installed this is wrong but you have silent_tools installed anyways
+silent_tools_dir = os.path.dirname(os.path.realpath(__file__))
+if silent_tools_dir not in sys.path:
+    sys.path.append(silent_tools_dir)
+
+import silent_tools
+from silent_tools import eprint
+
+# Don't throw an error when someone uses head
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL) 
+
+if (len(sys.argv) == 1):
+    eprint("")
+    eprint('silentextractparams by bcov - a tool to extract params files stored inside a silent file')
+    eprint("Usage:")
+    eprint("        silentextractparams myfile.silent")
+    sys.exit(1)
+
+silent_file = sys.argv[1]
+
+dumped_params = set()
+to_print = []
+with open(silent_file) as f:
+    for line in f:
+        if not line.startswith('REMARK PDBinfo-LABEL:'):
+            continue
+        sp = line.strip().split()
+        for maybe in sp:
+            if not maybe.startswith('PARAMS'):
+                continue
+            param_split = maybe.split(':')
+            name3 = param_split[1]
+            if name3 in dumped_params:
+                continue
+            params_file = silent_tools.base_64_decode_params(param_split[-1])
+            with open(f'{name3}.params', 'w') as f:
+                f.write(params_file)
+            dumped_params.add(name3)
+            to_print.append(f'-extra_res_fa {name3}.params')
+print(' '.join(to_print))
+

@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+
+import os
+import sys
+# if you pip installed this is wrong but you have silent_tools installed anyways
+silent_tools_dir = os.path.dirname(os.path.realpath(__file__))
+if silent_tools_dir not in sys.path:
+    sys.path.append(silent_tools_dir)
+
+import silent_tools
+from silent_tools import eprint
+import stat
+import math
+import shutil
+import io
+from Bio.PDB import MMCIFParser, PDBIO
+
+# Don't throw an error when someone uses head
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL) 
+
+
+
+cif_buffers = []
+if ( stat.S_ISFIFO(os.stat("/dev/stdin").st_mode) ):
+    cif_buffers += sys.stdin.readlines()
+cif_buffers += sys.argv[1:]
+
+if (len(cif_buffers) == 0):
+    eprint("")
+    eprint('silentsketchfromcifs by bcov - generates a silent from from cifs WITHOUT rosetta')
+    eprint("Usage:")
+    eprint("        cat list_of_cifs.list | silentsketchfromcifs > new.silent")
+    eprint("                             or")
+    eprint("        silentsketchfromcifs 1.cif 2.cif 3.cif > new.silent")
+    eprint("Flags:")
+    eprint("        -j cpus")
+    sys.exit(1)
+
+
+cifs = []
+for line in cif_buffers:
+    line = line.strip()
+    if (len(line) == 0):
+        continue
+    sp = line.split(" ")
+    for cif in sp:
+        cifs.append(cif)
+
+j_flag = None
+for i in range(len(cifs)-1, -1, -1):
+    elem = cifs[i]
+    if elem[0] != '-':
+        continue
+    if elem[1] == 'j':
+        if len(elem) == 2:
+            if i == len(cifs) - 1:
+                assert False, 'silentsketchfromcifs: Error, no argument for -j'
+            else:
+                j_flag = int(cifs[i+1])
+                cifs.pop(i+1)
+                cifs.pop(i)
+        else:
+            j_flag = int(elem[2:])
+            cifs.pop(i)
+        break
+    assert False, 'silentsketchfromcifs: Unknown flag ' + elem
+
+
+
+if j_flag is not None:
+    this_file = os.path.realpath(__file__)
+    tmp_dir = 'tmp_' + silent_tools.random_string(13)
+    os.mkdir(tmp_dir)
+    per_file = int(math.ceil( len(cifs) / j_flag ))
+    for i in range(j_flag):
+        file = os.path.join(tmp_dir, 'tmp_%i.list'%i)
+        with open(file, 'w') as f:
+            f.write('\n'.join(cifs[i*per_file:(i+1)*per_file]))
+            f.write('\n')
+    stdout, stderr, code = silent_tools.cmd2(f'ls {tmp_dir}/tmp* | parallel -j{j_flag} "cat {{}} | {this_file}"')
+    try:
+        shutil.rmtree(tmp_dir)
+    except:
+        pass
+    if len(stdout.strip()) > 0:
+        print(stdout.strip())
+    if len(stderr.strip()) > 0:
+        eprint(stderr.strip())
+    sys.exit(code)
+
+
+
+
+pre_tags = [os.path.basename(cifs) for cifs in cifs]
+
+if (len(cifs) != len(set(cifs))):
+    eprint("silentfastslice: Warning: %i duplicate paths specified"%(len(cifs) - len(set(cifs))))
+
+if (len(pre_tags) != len(set(pre_tags))):
+    eprint("silentfastslice: Warning: %i paths have duplicate names/tags. Going to rename duplicates to _1"%(len(pre_tags) - len(set(pre_tags))))
+
+
+
+dup_index = {}
+all_tags = set()
+
+first = True
+for cif in cifs:
+    tag = os.path.basename(cif)
+    if tag.endswith('.gz'):
+        tag = tag[:-len('.gz')]
+    if tag.endswith(".cif"):
+        tag = tag[:-len('.cif')]
+
+    # Deal with duplicate names
+    if tag in all_tags:
+        if tag in dup_index:
+            number = dup_index[tag]
+        else:
+            number = 1
+
+        while tag + "_%i"%number in all_tags:
+            number += 1
+
+        dup_index[tag] = number
+
+        tag = tag + "_%i"%number
+
+    all_tags.add(tag)
+
+    if not os.path.exists(cif):
+        eprint("silentsketchfromcifs: Error! cif does not exist:", cif)
+        continue
+
+    try:
+        cif_lines = open(cif).readlines()
+    except:
+        eprint("silentsketchfromcifs: Error! cif couldn't be opened", cif)
+        continue
+
+    # Convert cif_lines to pdb_lines using biopython
+    parser = MMCIFParser(QUIET=True)
+    structure = parser.get_structure(tag, io.StringIO(''.join(cif_lines)))
+    for residue in structure.get_residues():
+        if len(residue.resname) > 3:
+            residue.resname = residue.resname[:3]
+    pdb_io = PDBIO()
+    pdb_io.set_structure(structure)
+    pdb_buffer = io.StringIO()
+    pdb_io.save(pdb_buffer)
+    pdb_lines = pdb_buffer.getvalue().splitlines(keepends=True)
+
+    # with open('tmp.pdb', 'w') as f:
+    #     f.write(''.join(pdb_lines))
+
+    sys.stdout.write(''.join(silent_tools.pdb_to_structure(pdb_lines, tag, write_header=first, allow_extra_atoms=True )))
+    sys.stdout.flush()
+    first = False
+
+
+

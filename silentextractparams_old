@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]; then
+    echo >&2 "silentextractparams by bcov - a tool to extract params files stored inside a silent file"
+    echo >&2 "Usage:"
+    echo >&2 "        silentextractparams myfile.silent"
+    echo >&2 ""
+    exit 1
+fi
+
+if [[ ! -f $1 ]]; then
+    echo >&2 "silentextractparams: File not found: $1"
+    exit 1
+fi
+
+params_lines=$(grep 'REMARK PARAMS' $1)
+
+declare -A written_names
+
+IFS=$'\n'
+for param_line in $params_lines; do
+
+    content=$(echo "${param_line#REMARK PARAMS }" | tr '|' '\n' | sed 's/ICOOR/ICOOR_INTERNAL/g')
+    name=$(echo "$content" | awk '/^NAME /{print $2; exit}')
+    if [ -z "$name" ]; then
+        continue
+    fi
+    if [ -n "${written_names[$name]+x}" ]; then
+        continue
+    fi
+    written_names[$name]=1
+    echo "$content" > "${name}.params"
+    echo "Wrote ${name}.params"
+
+done
+unset IFS
+
+
