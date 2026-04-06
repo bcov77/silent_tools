@@ -564,3 +564,58 @@ def sketch_get_atoms(structure, atom_nums, chains=None):
     return final
 
 
+def extract_score_files_from_structure(lines):
+    '''
+    Extract the scorefile(s) inside of a silent file
+
+    It's important to realize that due to the nature of silent files, this process might be ugly if 
+    the silent files weren't created well. The header that defines the columns in the silent file
+    isn't required for every structure, therefore we just *assume* that each subsequent score line
+    is the same as the header above it. We can double check that (poorly) by looking at the number of columns
+
+    Returns a dictionary that could be pretty easily turned into a dataframe:
+        keys: tuple[header_cols]
+        values: list[tuple[data_cols]]
+
+    If we notice that we have found a line with the wrong number of columns, it will go into a tuple with headers
+    that are unknown%i. It's unclear what to do with those
+
+    '''
+    result = {}
+    current_header = None
+
+    for line in lines:
+        if not line.startswith("SCORE:"):
+            continue
+
+        parts = line.split()
+
+        if parts[-1] == "description":
+            current_header = tuple(parts)
+        else:
+            if current_header is not None and len(parts) == len(current_header):
+                key = current_header
+            else:
+                key = tuple('unknown%i' % i for i in range(len(parts)))
+
+            if key not in result:
+                result[key] = []
+            result[key].append(parts)
+
+    return result
+
+
+def extract_score_files_open(f):
+    '''
+    See extract_score_files_from_structure(). Takes an open silent file
+    '''
+    return extract_score_files_from_structure(f)
+
+
+def extract_score_files(path):
+    '''
+    See extract_score_files_from_structure(). Takes a path to a silent file
+    '''
+    with open(path, errors='ignore') as f:
+        return extract_score_files_open(f)
+

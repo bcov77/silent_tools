@@ -1,74 +1,76 @@
-#!/bin/bash
+#!/usr/bin/env python
 
-if [ $# -ne 1 ]; then
-    echo >&2 "silentscorefile by bcov - a tool to extract a scorefile from a silentfile"
-    echo >&2 "Usage:"
-    echo >&2 "        silentscorefile myfile.silent"
-    echo >&2 ""
-    echo >&2 "Note: This utility ensures that all score lines contain the same elements in"
-    echo >&2 "       the same order. If this is not the case, multiple scorefiles are produced"
-    exit 1
-fi
+import os
+import sys
+# if you pip installed this is wrong but you have silent_tools installed anyways
+silent_tools_dir = os.path.dirname(os.path.realpath(__file__))
+if silent_tools_dir not in sys.path:
+    sys.path.append(silent_tools_dir)
 
-if [[ ! -f $1 ]]; then
-    echo >&2 "silentscorefile: File not found: $1"
-    exit 1
-fi
+import silent_tools
+from silent_tools import eprint
 
-silent_dir="$(dirname $(type -p "$0"))"
-
-"$silent_dir"/silentassertuniquetags $1
-
-silentname=$(basename $1 .silent)
-scorename=${silentname}.sc
-
-# tmp_file=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13)
-# tmp_file="tmp_${tmp_file}.tmp"
-
-types=$(grep -a description $1 | tr -d "[:blank:]" | sort | uniq)
-num_types=$(echo "$types" | wc -l)
-
-if [[ $num_types -eq 1 ]]; then
-    head -n 2 $1 | grep -a description > $scorename    # just in case there's no sequence line
-    grep -a '^SCORE:' $1 | grep -a -v description >> $scorename
-    exit 0
-fi
-
-# Don't change this wording unless you change silentinjectscores
-echo >&2 "Warning!! Multiple scorefiles produced!!"
-for tp in $(echo $types); do echo >&2 $tp; done
-
-scorefiles=()
-has_header=()
-for i in $(seq 1 ${num_types}); do
-    scorefiles+=(${silentname}${i}.sc)
-    has_header+=('0')
-done
+# Don't throw an error when someone uses head
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE, SIG_DFL)
 
 
-current_file=-1
-IFS=$'\n' 
-for line in $(grep -a '^SCORE:' $1); do
-    if $(echo "$line" | grep -a -q description); then
-        # echo >&2 "$line"
-        current_file=$(echo "$types" | grep -a --line-number $(echo $line | tr -d "[:blank:]" ) | cut -d ':' -f1)
-        if [[ -z $current_file ]]; then
-            echo >&2 "Uh oh"
-            exit 1
-        fi
-        current_file=$((current_file-1))
-        if [[ ${has_header[current_file]} -eq 0 ]]; then
-            echo "$line" > ${scorefiles[current_file]}
-            has_header[$current_file]='1'
-        fi
-    else
-        # echo >&2 "$current_file"
-        # echo >&2 "$line"
-        # echo >&2 "${scorefiles[current_file]}"
-        echo "$line" >> ${scorefiles[current_file]}
-    fi
+if len(sys.argv) != 2:
+    eprint("")
+    eprint("silentscorefile by bcov - a tool to extract a scorefile from a silentfile")
+    eprint("Usage:")
+    eprint("        silentscorefile myfile.silent")
+    eprint("")
+    eprint("Note: This utility ensures that all score lines contain the same elements in")
+    eprint("       the same order. If this is not the case, multiple scorefiles are produced")
+    sys.exit(1)
 
-done
+silent_file = sys.argv[1]
 
+if not os.path.isfile(silent_file):
+    eprint("silentscorefile: File not found: %s" % silent_file)
+    sys.exit(1)
 
-unset IFS
+scores = silent_tools.extract_score_files(silent_file)
+
+# Check for duplicate tags (last column of each row is the description/tag)
+all_tags = []
+for rows in scores.values():
+    for row in rows:
+        all_tags.append(row[-1])
+
+seen = set()
+duplicates = set()
+for tag in all_tags:
+    if tag in seen:
+        duplicates.add(tag)
+    seen.add(tag)
+
+if duplicates:
+    eprint('')
+    eprint('==== WARNING!!! Tags in silent file are not unique! ====')
+    eprint('')
+    eprint('  Fix with: silentls %s | silentrename %s > fixed.silent' % (silent_file, silent_file))
+
+silentname = os.path.splitext(os.path.basename(silent_file))[0]
+
+num_types = len(scores)
+
+if num_types == 1:
+    header, rows = next(iter(scores.items()))
+    scorename = silentname + '.sc'
+    with open(scorename, 'w') as f:
+        f.write(' '.join(header) + '\n')
+        for row in rows:
+            f.write(' '.join(row) + '\n')
+else:
+    # Don't change this wording unless you change silentinjectscores
+    eprint("Warning!! Multiple scorefiles produced!!")
+    for i, header in enumerate(scores.keys(), 1):
+        eprint(' '.join(header))
+        scorename = silentname + str(i) + '.sc'
+        rows = scores[header]
+        with open(scorename, 'w') as f:
+            f.write(' '.join(header) + '\n')
+            for row in rows:
+                f.write(' '.join(row) + '\n')
