@@ -609,7 +609,7 @@ def extract_score_files_open(f):
     '''
     See extract_score_files_from_structure(). Takes an open silent file
     '''
-    return extract_score_files_from_structure(f)
+    return extract_score_files_from_silent_lines(f)
 
 
 def extract_score_files(path):
